@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import {
   selectListingById,
-  addBuyerRequest,
+  sendBuyerRequest,
 } from '../store/slices/marketplaceSlice'
 import {
   addToCart,
@@ -66,9 +66,9 @@ export default function ProductDetailView() {
     }
 
     setIsRequesting(true)
-    setTimeout(() => {
-      dispatch(
-        addBuyerRequest({
+    setTimeout(async () => {
+      const result = await dispatch(
+        sendBuyerRequest({
           listingId: listing.id,
           request: {
             id: `req-${Date.now()}`,
@@ -81,6 +81,10 @@ export default function ProductDetailView() {
         }),
       )
       setIsRequesting(false)
+      if (!result.success) {
+        showToast(result.error, 'error')
+        return
+      }
       setShowRequestForm(false)
       setRequestMsg('')
       setOfferAmount('')

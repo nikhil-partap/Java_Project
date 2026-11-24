@@ -3,9 +3,9 @@ import { Link } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import {
   selectAllListings,
-  deleteListing,
-  markListingSold,
-  updateListing,
+  removeListing,
+  purchaseListing,
+  saveListingEdit,
 } from '../store/slices/marketplaceSlice'
 import { useAuth } from '../context/AuthContext'
 import ListingCard from '../components/ListingCard'
@@ -40,27 +40,33 @@ export default function MyListings({
     propRequestCount ??
     myListings.reduce((sum, item) => sum + (item.buyerRequests?.length || 0), 0)
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (propRemove) {
       propRemove(id)
     } else {
-      dispatch(deleteListing(id))
-      showToast('Listing removed successfully.', 'info')
+      const result = await dispatch(removeListing(id))
+      if (result.success) showToast('Listing removed successfully.', 'info')
+      else showToast(result.error, 'error')
     }
   }
 
-  const handleMarkSold = (id) => {
+  const handleMarkSold = async (id) => {
     if (propMarkSold) {
       propMarkSold(id)
     } else {
-      dispatch(markListingSold({ listingId: id }))
-      showToast('Item marked as SOLD!', 'success')
+      // Sold to the first student who sent a request (same rule as the old local logic)
+      const listing = allListings.find((l) => l.id === id)
+      const buyerId = listing?.buyerRequests?.[0]?.buyerId ?? 'unknown'
+      const result = await dispatch(purchaseListing({ listingId: id, buyerId }))
+      if (result.success) showToast('Item marked as SOLD!', 'success')
+      else showToast(result.error, 'error') // e.g. 409: item already sold
     }
   }
 
-  const handleSaveEdit = (id, updatedFields) => {
-    dispatch(updateListing({ id, ...updatedFields }))
-    showToast('Listing updated successfully.', 'success')
+  const handleSaveEdit = async (id, updatedFields) => {
+    const result = await dispatch(saveListingEdit(id, updatedFields))
+    if (result.success) showToast('Listing updated successfully.', 'success')
+    else showToast(result.error, 'error')
   }
 
   if (!myListings.length) {

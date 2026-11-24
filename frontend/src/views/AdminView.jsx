@@ -1,5 +1,7 @@
 import { useDispatch, useSelector } from 'react-redux'
-import { selectAllListings, deleteListing } from '../store/slices/marketplaceSlice'
+import { useEffect, useState } from 'react'
+import { selectAllListings, removeListing } from '../store/slices/marketplaceSlice'
+import { getStats } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 import { formatInr, formatStamp } from '../lib/formatters'
 
@@ -12,16 +14,23 @@ export default function AdminView({
   const dispatch = useDispatch()
   const { users: authUsers, toggleUserBlock, showToast } = useAuth()
   const allListings = useSelector(selectAllListings)
+  const [stats, setStats] = useState(null)
+
+  // Live numbers from the backend (stays hidden when the backend is offline)
+  useEffect(() => {
+    getStats().then(setStats).catch(() => setStats(null))
+  }, [allListings])
 
   const users = propUsers || authUsers || []
   const listings = propListings || allListings
 
-  const handleDeleteListing = (id) => {
+  const handleDeleteListing = async (id) => {
     if (propDelete) {
       propDelete(id)
     } else {
-      dispatch(deleteListing(id))
-      showToast('Listing removed by administrator.', 'info')
+      const result = await dispatch(removeListing(id))
+      if (result.success) showToast('Listing removed by administrator.', 'info')
+      else showToast(result.error, 'error')
     }
   }
 
@@ -35,6 +44,16 @@ export default function AdminView({
 
   return (
     <section className="admin-layout">
+      {stats && (
+        <div className="summary-row" style={{ gridColumn: '1 / -1', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))' }}>
+          <article><span>Listings</span><strong>{stats.totalListings}</strong></article>
+          <article><span>Available</span><strong>{stats.available}</strong></article>
+          <article><span>Sold</span><strong>{stats.sold}</strong></article>
+          <article><span>Users</span><strong>{stats.totalUsers}</strong></article>
+          <article><span>Orders</span><strong>{stats.ordersProcessed}</strong></article>
+          <article><span>Revenue</span><strong>{formatInr(stats.revenue)}</strong></article>
+        </div>
+      )}
       <div className="panel admin-panel">
         <div className="panel-heading">
           <div>

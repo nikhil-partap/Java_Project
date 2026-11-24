@@ -1,6 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit'
 import { loadState } from '../../lib/storage'
-import { STORAGE_KEY } from '../../data/seedState'
+import { FALLBACK_IMAGE, STORAGE_KEY } from '../../data/seedState'
+import * as api from '../../lib/api'
 
 const initialAppState = loadState()
 
@@ -82,6 +83,29 @@ export const marketplaceSlice = createSlice({
         syncToLocalStorage(state.listings, state.purchaseHistory)
       }
     },
+    // Replace everything with fresh data from the backend (GET /api/state)
+    setMarketplaceData: (state, action) => {
+      const { listings, purchaseHistory } = action.payload
+      state.listings = (listings || []).map((listing) => ({
+        ...listing,
+        buyerRequests: Array.isArray(listing.buyerRequests) ? listing.buyerRequests : [],
+        imageUrl: listing.imageUrl || FALLBACK_IMAGE,
+        images: Array.isArray(listing.images) && listing.images.length > 0
+          ? listing.images
+          : [listing.imageUrl || FALLBACK_IMAGE],
+        status: listing.status || 'Available',
+      }))
+      state.purchaseHistory = purchaseHistory || []
+      syncToLocalStorage(state.listings, state.purchaseHistory)
+    },
+    // Apply a purchase record returned by POST /api/listings/{id}/purchase
+    applyPurchase: (state, action) => {
+      const purchase = action.payload
+      const listing = state.listings.find((item) => item.id === purchase.listingId)
+      if (listing) listing.status = 'Sold'
+      state.purchaseHistory.unshift(purchase)
+      syncToLocalStorage(state.listings, state.purchaseHistory)
+    },
     setLoading: (state, action) => {
       state.isLoading = action.payload
     },
@@ -97,9 +121,65 @@ export const {
   deleteListing,
   markListingSold,
   addBuyerRequest,
+  setMarketplaceData,
+  applyPurchase,
   setLoading,
   setError,
 } = marketplaceSlice.actions
+
+// ---- Thunks: call the backend first, fall back to the local reducer when it is offline ----
+// Each returns { success: true } or { success: false, error } so views can show a toast.
+function onlineOrLocal(callApi, onServerData, onOffline) {
+  return async (dispatch) => {
+    try {
+      const data = await callApi()
+      onServerData(dispatch, data)
+      return { success: true }
+    } catch (err) {
+      if (err.offline) {
+        onOffline(dispatch)
+        return { success: true, offline: true }
+      }
+      return { success: false, error: err.message }
+    }
+  }
+}
+
+export const saveNewListing = (listing) =>
+  onlineOrLocal(
+    () => api.createListing(listing),
+    (dispatch, saved) => dispatch(addListing(saved)),
+    (dispatch) => dispatch(addListing(listing)),
+  )
+
+export const saveListingEdit = (id, fields) =>
+  onlineOrLocal(
+    () => api.updateListing(id, fields),
+    (dispatch, saved) => dispatch(updateListing(saved)),
+    (dispatch) => dispatch(updateListing({ id, ...fields })),
+  )
+
+export const removeListing = (id) =>
+  onlineOrLocal(
+    () => api.deleteListing(id),
+    (dispatch) => dispatch(deleteListing(id)),
+    (dispatch) => dispatch(deleteListing(id)),
+  )
+
+export const sendBuyerRequest = ({ listingId, request }) =>
+  onlineOrLocal(
+    () => api.addBuyerRequest(listingId, request),
+    (dispatch, savedListing) => dispatch(updateListing(savedListing)),
+    (dispatch) => dispatch(addBuyerRequest({ listingId, request })),
+  )
+
+// On 409 (already sold) the error message is returned and nothing is marked sold.
+export const purchaseListing = ({ listingId, buyerId }) =>
+  onlineOrLocal(
+    () => api.purchaseListing(listingId, buyerId),
+    (dispatch, purchase) => dispatch(applyPurchase(purchase)),
+    (dispatch) => dispatch(markListingSold({ listingId, buyerId })),
+  )
 
 // Selectors
 export const selectAllListings = (state) => state.marketplace.listings

@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import {
   selectAvailableListings,
-  deleteListing,
-  addBuyerRequest,
-  updateListing,
+  removeListing,
+  sendBuyerRequest,
+  saveListingEdit,
 } from '../store/slices/marketplaceSlice'
 import { useAuth } from '../context/AuthContext'
 import ListingCard from '../components/ListingCard'
@@ -95,12 +95,12 @@ export default function BuyerMarketplace({
     })
   }
 
-  const handleOfferSubmission = (listingId, offerData) => {
+  const handleOfferSubmission = async (listingId, offerData) => {
     if (propRequestItem) {
       propRequestItem(listingId, offerData)
     } else {
-      dispatch(
-        addBuyerRequest({
+      const result = await dispatch(
+        sendBuyerRequest({
           listingId,
           request: {
             id: `req-${Date.now()}`,
@@ -112,22 +112,28 @@ export default function BuyerMarketplace({
           },
         }),
       )
+      if (!result.success) {
+        showToast(result.error, 'error')
+        return
+      }
       showToast('Buy inquiry sent to seller successfully!', 'success')
     }
   }
 
-  const handleDeleteListing = (id) => {
+  const handleDeleteListing = async (id) => {
     if (propOnDelete) {
       propOnDelete(id)
     } else {
-      dispatch(deleteListing(id))
-      showToast('Listing deleted.', 'info')
+      const result = await dispatch(removeListing(id))
+      if (result.success) showToast('Listing deleted.', 'info')
+      else showToast(result.error, 'error')
     }
   }
 
-  const handleSaveEdit = (id, updatedFields) => {
-    dispatch(updateListing({ id, ...updatedFields }))
-    showToast('Listing updated successfully.', 'success')
+  const handleSaveEdit = async (id, updatedFields) => {
+    const result = await dispatch(saveListingEdit(id, updatedFields))
+    if (result.success) showToast('Listing updated successfully.', 'success')
+    else showToast(result.error, 'error')
   }
 
   const categories = [...new Set(listings.map((item) => item.category).filter(Boolean))]

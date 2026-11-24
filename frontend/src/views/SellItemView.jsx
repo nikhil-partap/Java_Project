@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDispatch } from 'react-redux'
-import { addListing } from '../store/slices/marketplaceSlice'
+import { saveNewListing } from '../store/slices/marketplaceSlice'
 import { useAuth } from '../context/AuthContext'
 import { FALLBACK_IMAGE } from '../data/seedState'
 import { InputField, SelectField, TextAreaField, Button } from '../components/common'
@@ -101,7 +101,7 @@ export default function SellItemView() {
 
     setIsSubmitting(true)
 
-    setTimeout(() => {
+    setTimeout(async () => {
       const primaryImage = images.length > 0 ? images[0] : FALLBACK_IMAGE
       const newListing = {
         id: `l-${Date.now()}`,
@@ -119,8 +119,12 @@ export default function SellItemView() {
         buyerRequests: [],
       }
 
-      dispatch(addListing(newListing))
+      const result = await dispatch(saveNewListing(newListing))
       setIsSubmitting(false)
+      if (!result.success) {
+        showToast(result.error, 'error')
+        return
+      }
       showToast('Listing published successfully to the campus marketplace!', 'success')
       navigate('/my-listings')
     }, 450)

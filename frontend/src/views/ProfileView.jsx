@@ -67,8 +67,8 @@ export default function ProfileView() {
     }
 
     setIsSaving(true)
-    setTimeout(() => {
-      updateProfile({
+    setTimeout(async () => {
+      await updateProfile({
         name: formData.name.trim(),
         email: formData.email.trim().toLowerCase(),
         phone: formData.phone.trim(),

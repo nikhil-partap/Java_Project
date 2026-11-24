@@ -16,7 +16,7 @@ const ROUTE_TITLES = {
 
 export default function Topbar() {
   const location = useLocation()
-  const { currentUser, toggleMode } = useAuth()
+  const { currentUser, toggleMode, backendOnline } = useAuth()
   const cartCount = useSelector(selectCartCount)
 
   const pathname = location.pathname
@@ -40,6 +40,14 @@ export default function Topbar() {
       </div>
 
       <div className="topbar-actions">
+        {backendOnline !== null && (
+          <small
+            title={backendOnline ? 'Connected to the Java backend' : 'Backend unreachable - using saved local data'}
+            style={{ color: backendOnline ? '#15803d' : '#b45309', fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+          >
+            ● Backend: {backendOnline ? 'online' : 'offline'}
+          </small>
+        )}
         <Link to="/cart" className="topbar-cart-link" aria-label="Shopping Cart">
           <span className="cart-icon" aria-hidden="true">🛒</span>
           <span className="cart-label">Cart</span>

@@ -82,15 +82,15 @@ export default function GuestPage() {
     if (emailErr || passErr) return
 
     setIsLoading(true)
-    setTimeout(() => {
+    setTimeout(async () => {
       if (authMode === 'login') {
-        const res = login(formData.email, formData.password)
+        const res = await login(formData.email, formData.password)
         setIsLoading(false)
         if (res.success) {
           navigate('/marketplace')
         }
       } else {
-        const res = register({
+        const res = await register({
           name: formData.name || formData.email.split('@')[0],
           email: formData.email,
           password: formData.password,
@@ -106,8 +106,8 @@ export default function GuestPage() {
   // Demo login helper
   const handleQuickLogin = (email, password) => {
     setIsLoading(true)
-    setTimeout(() => {
-      const res = login(email, password)
+    setTimeout(async () => {
+      const res = await login(email, password)
       setIsLoading(false)
       if (res.success) navigate('/marketplace')
     }, 300)

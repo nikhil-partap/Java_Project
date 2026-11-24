@@ -6,7 +6,7 @@ import {
   selectCartItems,
   selectCartTotalPrice,
 } from '../store/slices/cartSlice'
-import { addBuyerRequest } from '../store/slices/marketplaceSlice'
+import { sendBuyerRequest } from '../store/slices/marketplaceSlice'
 import { useAuth } from '../context/AuthContext'
 import { formatINR } from '../lib/formatters'
 import { Button } from '../components/common'
@@ -24,11 +24,11 @@ export default function CartView() {
     if (cartItems.length === 0) return
     setIsCheckingOut(true)
 
-    setTimeout(() => {
+    setTimeout(async () => {
       // Create a buyer request for each item in the cart
-      cartItems.forEach((item) => {
+      const results = await Promise.all(cartItems.map((item) =>
         dispatch(
-          addBuyerRequest({
+          sendBuyerRequest({
             listingId: item.id,
             request: {
               id: `req-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -39,8 +39,15 @@ export default function CartView() {
               createdAt: new Date().toISOString(),
             },
           }),
-        )
-      })
+        ),
+      ))
+
+      const failed = results.find((result) => !result.success)
+      if (failed) {
+        setIsCheckingOut(false)
+        showToast(failed.error, 'error')
+        return
+      }
 
       dispatch(clearCart())
       setIsCheckingOut(false)
