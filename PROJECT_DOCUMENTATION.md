@@ -1,303 +1,247 @@
-# Campus Marketplace — Project Documentation
+# Campus Marketplace project documentation
 
 | | |
 |---|---|
-| **Course** | Programming in Java (25CSE0202) |
-| **Institute** | Chitkara University Institute of Engineering and Technology |
-| **Programme / Semester** | B.E. CSE (AI & ML), 3rd Semester, Batch 2025 |
-| **Session** | July – Dec 2026 |
-| **Team Members** | _(fill in names and roll numbers)_ |
-| **Repository** | https://github.com/nikhil-partap/Java_Project |
-
----
+| Course | Programming in Java (25CSE0202) |
+| Institute | Chitkara University Institute of Engineering and Technology |
+| Programme / Semester | B.E. CSE (AI & ML), 3rd Semester, Batch 2025 |
+| Session | July - Dec 2026 |
+| Team Members | _(fill in names and roll numbers)_ |
+| Repository | https://github.com/nikhil-partap/Java_Project |
 
 ## 1. Introduction
 
-**Campus Marketplace** is a web application where college students can **buy and sell used items within their campus** — textbooks, cycles, lab kits, electronics, furniture and hostel essentials.
+Campus Marketplace is a web app where students of one college can buy and sell used items like textbooks, cycles, lab kits, electronics and hostel stuff.
 
-Students who are leaving hostels or moving to the next year often have useful items they no longer need, while juniors are looking for the same items at low prices. Today this happens through scattered WhatsApp groups and notice boards. Campus Marketplace gives one organised place to list items, browse them, send purchase requests and complete sales safely.
+Seniors leaving the hostel usually have things they don't need anymore, and juniors want the same things at a low price. Right now this happens on WhatsApp groups and notice boards, which is messy. We made one place where students can list items, browse them, send purchase requests and complete the sale.
 
-## 2. Problem Statement
+## 2. Problem statement
 
-- No single, organised platform for second-hand trading inside a campus.
-- Buyers can't easily search or filter what is available.
-- When two students want the same item at the same time, it is unclear who gets it (the **same item can be "sold twice"**).
-- No record of past purchases and no way for an administrator to block misuse.
+- There is no proper platform for second-hand buying and selling inside the campus.
+- Buyers cannot search or filter what is available.
+- If two students try to buy the same item at the same time, it is not clear who gets it, and the item can end up "sold twice".
+- There is no purchase record, and nobody can block a user who misuses the platform.
 
-## 3. Objectives
+## 3. Objectives and scope
 
-1. Build a working full-stack application: a React frontend and a **Java backend**.
-2. Apply the Java concepts covered in the course — **OOP, Strings, Exception Handling, Collections Framework and Multithreading**.
-3. Handle **many users at the same time** safely using threads and synchronization, so an item can never be sold twice.
-4. Keep the design simple, layered and easy to extend (e.g. a database can be added later using JDBC).
+1. Make a working full-stack app with a React frontend and a Java backend.
+2. Use the Java topics from our course in the backend: OOP, Strings, exception handling, collections, file handling and multithreading.
+3. Handle many users at once using threads and synchronization so that one item can never be sold twice.
+4. Keep the code in layers so that a database (JDBC) can be added later.
 
----
+Scope: the app is meant for a single campus and runs on a local machine. Payments are not real. The backend only simulates a payment step with a short `Thread.sleep()`.
 
 ## 4. Features
 
-### Buyer
+Buyer side
 - Register and log in with a campus e-mail
-- Browse all listings; **search** by title/description; **filter** by category and maximum price; **sort** by newest or price
-- View item details (photos, condition, seller, location)
-- Add items to a cart and send **purchase requests** to sellers
-- View **purchase history**
+- Browse listings, search by title or description, filter by category and max price, sort by newest or price
+- See item details (photos, condition, seller, location)
+- Add items to cart, send purchase requests and see purchase history
 
-### Seller
-- Switch between Buyer and Seller mode
-- **Create listings** with photos, price, category, condition and location
-- **Edit / delete** own listings
-- See incoming buyer requests and **mark an item as sold**
+Seller side
+- Switch between buyer and seller mode
+- Create listings with photos, price, category, condition and location
+- Edit or delete own listings, see buyer requests and mark an item as sold
 
-### Admin
-- View all users and listings
-- **Block / unblock** users (blocked users can't log in, list or buy)
-- Remove inappropriate listings
-- Live **statistics** from the backend (total listings, available, sold, users, orders processed, revenue)
+Admin
+- See all users and listings
+- Block or unblock users (a blocked user cannot log in, list or buy)
+- Remove bad listings
+- See live statistics from the backend (listings, available, sold, users, orders processed, revenue)
 
-### System
-- **Race-condition protection**: if several buyers try to buy the same item at the same moment, exactly one succeeds; the others are told it is already sold
-- **Offline fallback**: if the backend is not running, the frontend keeps working using the browser's localStorage
-- Clear error messages for invalid input (empty title, negative price, duplicate e-mail, etc.)
+Other things we added:
+- If several buyers try to buy the same item at the same moment, only one purchase goes through. The others get an "already sold" error.
+- If the backend is not running, the frontend still works using the browser's localStorage.
+- Proper error messages for bad input like an empty title, negative price or duplicate e-mail.
 
----
+## 5. Technologies used
 
-## 5. Technology Stack — What Is Used and Where
+### 5.1 Backend
 
-### 5.1 Backend (Java)
+The backend is plain Java 21 with only the JDK, no Spring or any other library.
 
-| Technology | Where it is used | Why |
-|---|---|---|
-| **Java 21 (JDK only)** | Entire `backend/` folder | Course language; no external libraries needed |
-| **`com.sun.net.httpserver.HttpServer`** | `Main.java`, `http/Router.java` | Built-in JDK web server to expose the REST API on port 8080 |
-| **REST + JSON** | `http/Router.java` (routes), `http/Json.java` | Standard way for the frontend and backend to talk |
-| **Hand-written JSON parser/writer** | `http/Json.java` | Converts JSON text ↔ Java Maps/Lists without any library (uses recursion and `StringBuilder`) |
-| **Collections Framework** | `repository/InMemoryRepository.java`, `service/MarketplaceService.java` | Working storage of users, listings, purchases while the server runs |
-| **File handling** (`File`, `FileReader`/`BufferedReader`, `FileWriter`/`BufferedWriter`) | `storage/FileStorage.java`, `toFields()`/`fromFields()` in every model | Saves all data to text files in `backend/data/` after every change and loads it on startup, so nothing is lost on restart |
-| **`java.util.concurrent`** (ExecutorService, Callable, Future, AtomicInteger, ConcurrentHashMap) | `Main.java`, `service/MarketplaceService.java`, `thread/OrderProcessor.java` | Handle many requests and orders in parallel, safely |
-| **Threads** (extends Thread, daemon, sleep, interrupt) | `thread/MarketplaceMonitorThread.java` | Background thread that refreshes live statistics every 3 seconds |
-| **`java.time`** | `model/BaseEntity.java`, `model/Listing.java` | Timestamps (ISO-8601) and "newest first" sorting |
-| **Batch / shell scripts** | `backend/run.bat`, `backend/run.sh` | One-command compile (`javac`) and run (`java`) |
+- `com.sun.net.httpserver.HttpServer` (built into the JDK) runs the REST API on port 8080. It is set up in `Main.java` and the routes are in `http/Router.java`.
+- We wrote our own JSON parser and writer in `http/Json.java`. It uses recursion and `StringBuilder` to convert JSON text to Java maps and lists and back.
+- Collections (`ArrayList`, `HashMap`, `ConcurrentHashMap` etc.) hold users, listings and purchases while the server runs. See `repository/InMemoryRepository.java` and `service/MarketplaceService.java`.
+- File handling with `FileReader`/`BufferedReader` and `FileWriter`/`BufferedWriter` in `storage/FileStorage.java`. Data is saved to text files after every change and loaded again on startup.
+- `java.util.concurrent` (ExecutorService, Callable, Future, AtomicInteger, ConcurrentHashMap) in `Main.java`, `MarketplaceService.java` and `thread/OrderProcessor.java`.
+- A normal `Thread` subclass, `thread/MarketplaceMonitorThread.java`, which updates statistics every 3 seconds.
+- `java.time` for timestamps and newest-first sorting (`model/BaseEntity.java`, `model/Listing.java`).
+- `backend/run.bat` and `backend/run.sh` compile with `javac` and run with `java` in one step.
 
-### 5.2 Frontend (Web)
+### 5.2 Frontend
 
-| Technology | Where it is used | Why |
-|---|---|---|
-| **React 19** | `frontend/src/` (components and views) | Component-based user interface |
-| **Vite** | `frontend/vite.config.js` | Fast development server and build tool; **proxies `/api` calls to the Java backend** |
-| **Redux Toolkit** | `frontend/src/store/` (`marketplaceSlice.js`, `cartSlice.js`) | Global state for listings, purchases and the cart |
-| **React Context** | `frontend/src/context/AuthContext.jsx` | Logged-in user, login/register/logout, notifications |
-| **React Router v7** | `frontend/src/App.jsx`, `components/routing/` | Page navigation and protected/admin-only routes |
-| **Fetch API** | `frontend/src/lib/api.js` | Calls the Java backend's REST endpoints |
-| **localStorage** | `frontend/src/lib/storage.js`, slices | Cache and offline fallback |
-| **HTML5 Canvas / FileReader** | `frontend/src/lib/imageCompressor.js` | Compresses uploaded photos before sending |
-| **CSS (custom properties, Flexbox, Grid)** | `frontend/src/index.css`, `App.css`, `BuyerMarketplace.css` | Responsive styling |
+- React 19 for the UI (`frontend/src/`).
+- Vite as the dev server. In `vite.config.js` we set a proxy so `/api` calls go to the Java backend.
+- Redux Toolkit for listings, purchases and cart (`store/marketplaceSlice.js`, `store/cartSlice.js`).
+- React Context (`context/AuthContext.jsx`) for the logged-in user, login/logout and notifications.
+- React Router v7 for pages and admin-only routes (`App.jsx`, `components/routing/`).
+- Fetch API in `lib/api.js` to call the backend, and localStorage in `lib/storage.js` as cache and offline fallback.
+- Canvas and FileReader in `lib/imageCompressor.js` to compress photos before upload.
+- Plain CSS with Flexbox and Grid (`index.css`, `App.css`, `BuyerMarketplace.css`).
 
-### 5.3 Tools
+Tools we used: Git and GitHub, VS Code / IntelliJ IDEA, npm, and curl or the browser for testing the API.
 
-| Tool | Use |
-|---|---|
-| Git & GitHub | Version control and team collaboration |
-| VS Code / IntelliJ IDEA | Code editing |
-| npm | Installing frontend packages |
-| curl / browser | Testing API endpoints |
-
----
-
-## 6. System Architecture
+## 6. Design and architecture
 
 ```
-┌──────────────────────────────────────────────┐
-│     Browser — React Frontend (port 5173)     │
-│  Views → Redux / AuthContext → lib/api.js    │
-└──────────────────────┬───────────────────────┘
-                       │  HTTP requests with JSON  (/api/...)
-                       ▼
-┌──────────────────────────────────────────────┐
-│        Java Backend (port 8080)              │
-│                                              │
-│  Main ── HttpServer + thread pool (8)        │
-│           │                                  │
-│  Router (HTTP layer)                         │
-│   • routing, CORS                            │
-│   • one central exception handler            │
-│           │                                  │
-│  MarketplaceService (business logic)         │
-│   • validation, rules                        │
-│   • purchases run on an order thread pool (4)│
-│   • synchronized → no double selling         │
-│           │                                  │
-│  Repository<T>  →  InMemoryRepository<T>     │
-│   (ArrayList + ConcurrentHashMap)            │
-│           │                                  │
-│  FileStorage  →  backend/data/*.txt          │
-│   (save after every change, load on start)   │
-│                                              │
-│  MarketplaceMonitorThread (daemon)           │
-│   → recomputes statistics every 3 s          │
-└──────────────────────────────────────────────┘
++-------------------------------------------+
+|  Browser: React frontend (port 5173)      |
+|  views -> Redux / AuthContext -> api.js   |
++---------------------+---------------------+
+                      |  HTTP + JSON (/api/...)
+                      v
++-------------------------------------------+
+|  Java backend (port 8080)                 |
+|                                           |
+|  Main: HttpServer + request pool (8)      |
+|  Router: routes, CORS, error handling     |
+|  MarketplaceService: rules, validation,   |
+|     order pool (4), synchronized purchase |
+|  Repository<T> / InMemoryRepository<T>    |
+|  FileStorage: backend/data/*.txt          |
+|  MarketplaceMonitorThread: stats every 3s |
++-------------------------------------------+
 ```
 
-**Layered design** — each layer has one job:
-- **HTTP layer** (`http/`) — understands URLs, methods and JSON only.
-- **Service layer** (`service/`) — all business rules (who can buy, valid prices, duplicate e-mails).
-- **Repository layer** (`repository/`) — stores and finds objects. Because the service only uses the `Repository<T>` interface, the in-memory storage can later be replaced by a **database (JDBC)** without changing the service.
-- **Storage layer** (`storage/`) — `FileStorage` writes the collections to text files and reads them back on startup (file persistence).
-- **Model layer** (`model/`) — the data classes.
+We divided the backend into layers, and each package does one job:
+- `http/` deals only with URLs, HTTP methods and JSON.
+- `service/` has the business rules, for example who can buy, valid prices and duplicate e-mails.
+- `repository/` stores and finds objects. The service only talks to the `Repository<T>` interface, so later we can swap the in-memory version for a JDBC one without changing the service.
+- `storage/` has `FileStorage`, which writes the collections to text files and reads them back.
+- `model/` has the data classes.
 
----
-
-## 7. Project Structure
+## 7. Project structure
 
 ```
 Java_Project/
 ├── backend/
-│   ├── run.bat / run.sh                 compile + run
-│   ├── data/                            saved data (created on first run, not in git)
+│   ├── run.bat / run.sh            compile + run
+│   ├── data/                       saved data (made on first run, not in git)
 │   └── src/com/campusmarketplace/
-│       ├── Main.java                    starts server, thread pools, monitor, shutdown hook
-│       ├── http/
-│       │   ├── Router.java              routes + central error handling
-│       │   └── Json.java                JSON parser and writer
-│       ├── service/
-│       │   ├── MarketplaceService.java  business logic
-│       │   └── SeedData.java            demo users and listings
-│       ├── repository/
-│       │   ├── Repository.java          generic interface
-│       │   └── InMemoryRepository.java  collection-based implementation
-│       ├── storage/
-│       │   └── FileStorage.java         saves/loads data to text files (file handling)
-│       ├── model/
-│       │   ├── BaseEntity.java          abstract parent class
-│       │   ├── User.java
-│       │   ├── Listing.java
-│       │   ├── BuyerRequest.java
-│       │   └── Purchase.java
-│       ├── exception/
-│       │   ├── ApiException.java        base (carries HTTP status)
-│       │   ├── ValidationException.java     400
-│       │   ├── UnauthorizedException.java   401
-│       │   ├── ForbiddenException.java      403
-│       │   ├── NotFoundException.java       404
-│       │   └── ConflictException.java       409
-│       └── thread/
-│           ├── OrderProcessor.java      Callable purchase job
-│           └── MarketplaceMonitorThread.java  daemon statistics thread
+│       ├── Main.java               server, thread pools, monitor, shutdown hook
+│       ├── http/                   Router.java, Json.java
+│       ├── service/                MarketplaceService.java, SeedData.java (demo data)
+│       ├── repository/             Repository.java, InMemoryRepository.java
+│       ├── storage/                FileStorage.java
+│       ├── model/                  BaseEntity, User, Listing, BuyerRequest, Purchase
+│       ├── exception/              ApiException and 5 subclasses
+│       └── thread/                 OrderProcessor.java, MarketplaceMonitorThread.java
 ├── frontend/
-│   ├── vite.config.js                   dev server + /api proxy
-│   └── src/
-│       ├── App.jsx                      routes
-│       ├── views/                       pages (Marketplace, Sell, Cart, Admin, ...)
-│       ├── components/                  reusable UI pieces
-│       ├── store/                       Redux slices
-│       ├── context/AuthContext.jsx      login state
-│       └── lib/api.js                   backend API client
-├── src/, lib/                           earlier console version
-├── README.md                            how to run
-├── PROJECT_DOCUMENTATION.md             this file
-└── BACKEND_VIVA_PREP_GUIDE.md           viva preparation
+│   ├── vite.config.js              dev server + /api proxy
+│   └── src/                        App.jsx, views/, components/, store/, context/, lib/api.js
+├── src/, lib/                      earlier console version
+├── README.md
+├── PROJECT_DOCUMENTATION.md
+└── BACKEND_VIVA_PREP_GUIDE.md
 ```
 
----
+The exception classes are `ValidationException` (400), `UnauthorizedException` (401), `ForbiddenException` (403), `NotFoundException` (404) and `ConflictException` (409). All of them extend `ApiException`, which stores the HTTP status.
 
-## 8. Data Model
+## 8. Data model
 
-| Class | Main fields | Notes |
-|---|---|---|
-| `BaseEntity` (abstract) | `id` | Parent of all entities; abstract `toMap()` |
-| `User` | name, email, password, phone, department, year, mode (buyer/seller), bio, role (user/admin), blocked | Password is never sent to the frontend |
-| `Listing` | ownerId, title, category, price, condition, description, location, status (Available / Pending / Sold), createdAt, images, buyerRequests | Implements `Comparable` (newest first) |
-| `BuyerRequest` | buyerId, message, offerPrice, status, createdAt | Belongs to a listing |
-| `Purchase` | listingId, title, price, sellerId, buyerId, purchasedAt | Immutable record of a completed sale |
+All model classes extend the abstract class `BaseEntity`, which has the `id` and an abstract `toMap()`.
 
-**Listing status flow:**
+- `User`: name, email, password, phone, department, year, mode (buyer/seller), bio, role (user/admin), blocked. The password is never sent to the frontend.
+- `Listing`: ownerId, title, category, price, condition, description, location, status, createdAt, images and its list of buyer requests. It implements `Comparable` so listings sort newest first.
+- `BuyerRequest`: buyerId, message, offerPrice, status, createdAt. It belongs to a listing.
+- `Purchase`: listingId, title, price, sellerId, buyerId, purchasedAt. Once created it is not changed.
+
+A listing's status goes like this:
 ```
-Available ──(buyer sends request)──► Pending ──(purchase)──► Sold
+Available --(buyer sends request)--> Pending --(purchase)--> Sold
 ```
 
----
+FileStorage saves this data in four files inside `backend/data/`: `users.txt`, `listings.txt`, `requests.txt` and `purchases.txt`. Each line is one object with fields separated by `|`. Every model class has `toFields()` to write a line and a static `fromFields()` to read it back.
 
-## 9. REST API Summary
+## 9. REST API
 
 | Method | Endpoint | Purpose |
 |---|---|---|
-| GET | `/api/health` | Check that the server is running |
-| GET | `/api/state` | All users, listings and purchases (initial load) |
+| GET | `/api/health` | Check server is running |
+| GET | `/api/state` | Users, listings and purchases (first load) |
 | POST | `/api/auth/login` | Log in |
-| POST | `/api/auth/register` | Create an account |
-| PUT | `/api/users/{id}` | Update profile / switch buyer–seller mode |
-| POST | `/api/users/{id}/toggle-block` | Admin: block or unblock a user |
+| POST | `/api/auth/register` | Sign up |
+| PUT | `/api/users/{id}` | Update profile or switch mode |
+| POST | `/api/users/{id}/toggle-block` | Admin blocks/unblocks a user |
 | GET | `/api/listings` | List items (`?category=&search=&sort=`) |
-| POST | `/api/listings` | Create a listing |
-| PUT | `/api/listings/{id}` | Edit a listing |
-| DELETE | `/api/listings/{id}` | Delete a listing |
-| POST | `/api/listings/{id}/requests` | Send a purchase request |
-| POST | `/api/listings/{id}/purchase` | Complete a purchase (thread-safe) |
+| POST | `/api/listings` | New listing |
+| PUT | `/api/listings/{id}` | Edit listing |
+| DELETE | `/api/listings/{id}` | Delete listing |
+| POST | `/api/listings/{id}/requests` | Send purchase request |
+| POST | `/api/listings/{id}/purchase` | Buy (thread-safe) |
 | GET | `/api/purchases` | Purchase history |
-| GET | `/api/stats` | Live statistics from the monitor thread |
+| GET | `/api/stats` | Stats from the monitor thread |
 
-Errors are returned as `{"error": "message"}` with the proper HTTP status (400, 401, 403, 404, 405, 409, 413, 500).
+On error the backend sends `{"error": "message"}` with the right status code (400, 401, 403, 404, 405, 409, 413 or 500).
 
----
+## 10. Java concepts used in the project
 
-## 10. Java Concepts Applied (Course Mapping)
-
-| Unit (Lectures) | Concept | Where in the project |
+| Topic (lectures) | Concept | Where |
 |---|---|---|
-| **OOP (1–5)** | Classes, objects, constructors, `this`, `static` | All model classes, `Main.java`, `BaseEntity.nowIso()` |
-| | Encapsulation | Private fields + getters; `User` password has no getter |
-| | Inheritance | `BaseEntity` → `User`, `Listing`, `BuyerRequest`, `Purchase`; `ApiException` → 5 exceptions; `MarketplaceMonitorThread extends Thread` |
-| | Abstraction | `abstract class BaseEntity`; `interface Repository<T>` |
+| OOP (1-5) | Classes, constructors, `this`, `static` | Model classes, `Main.java`, `BaseEntity.nowIso()` |
+| | Encapsulation | Private fields with getters, no getter for password |
+| | Inheritance | `BaseEntity` and its 4 children, `ApiException` and 5 subclasses, `MarketplaceMonitorThread extends Thread` |
+| | Abstraction | `abstract class BaseEntity`, `interface Repository<T>` |
 | | Polymorphism | Overridden `toMap()`, `toString()`, `run()`, `call()`, `compareTo()`; `Repository<User> users = new InMemoryRepository<>()` |
-| **Strings & Wrappers (6–9)** | `StringBuilder` | `Json.java` writer and parser |
-| | String methods (`trim`, `toLowerCase`, `equalsIgnoreCase`, `split`, `substring`, `format`) | Login, register, search, routing, log messages |
-| | Wrapper classes, parsing, autoboxing | `Integer.parseInt`, `Double.parseDouble`, `Map.put("isBlocked", blocked)` |
-| **Exception Handling (10–15)** | Custom checked exceptions | `exception/` package |
-| | `throw` / `throws` / propagation | Service methods throw; `Router.handle()` catches centrally |
-| | try / catch / finally, multi-catch | `Router.handle()`, `Listing.parseTime()` |
-| | try-with-resources | `Router.readBody()`, `Router.send()`, `FileStorage` readers/writers |
-| **File Handling** | `File`, `FileReader` + `BufferedReader.readLine()`, `FileWriter` + `BufferedWriter`, `IOException` | `storage/FileStorage.java` — data saved to `backend/data/*.txt` and loaded on startup |
-| | Converting objects to/from text lines | `toFields()` (abstract in `BaseEntity`, overridden in each model) and static `fromFields()` |
-| **Collections (16–25)** | `ArrayList`, `HashSet`, `HashMap`, `LinkedHashMap`, `TreeMap`, `ConcurrentHashMap` | Repository, service, JSON, statistics |
-| | `Iterator` and safe removal | `getListings()` filter, `deleteById()` |
-| | `Comparable` / `Comparator` / `Collections.sort` | Sort listings by newest or price |
-| **Multithreading (26–31+)** | Extending `Thread`, `start()`, `sleep()`, `interrupt()`, daemon thread, thread states | `MarketplaceMonitorThread`, `Main.java` |
-| | `ExecutorService` thread pools | Request pool (8), order pool (4) in `Main.java` |
-| | `Callable` and `Future` | `OrderProcessor`, `MarketplaceService.purchase()` |
-| | `synchronized` methods and blocks (race-condition fix) | `completePurchase()`, `register()`, `createListing()`, repository |
+| Strings and wrappers (6-9) | `StringBuilder` | `Json.java` |
+| | `trim`, `toLowerCase`, `equalsIgnoreCase`, `split`, `substring`, `format` | Login, register, search, routing, logs |
+| | Parsing and autoboxing | `Integer.parseInt`, `Double.parseDouble`, putting a boolean into a Map |
+| Exception handling (10-15) | Custom checked exceptions | `exception/` package |
+| | `throw`, `throws`, propagation | Service throws, `Router.handle()` catches |
+| | try/catch/finally, multi-catch | `Router.handle()`, `Listing.parseTime()` |
+| | try-with-resources | `Router.readBody()`, `Router.send()`, `FileStorage` |
+| File handling | `File`, `BufferedReader.readLine()`, `BufferedWriter`, `IOException` | `FileStorage.java` |
+| | Object to text line and back | `toFields()` / `fromFields()` |
+| Collections (16-25) | `ArrayList`, `HashSet`, `HashMap`, `LinkedHashMap`, `TreeMap`, `ConcurrentHashMap` | Repository, service, JSON, stats |
+| | `Iterator` with safe remove | `getListings()` filter, `deleteById()` |
+| | `Comparable`, `Comparator`, `Collections.sort` | Sorting listings |
+| Multithreading (26-31+) | Extending `Thread`, `start()`, `sleep()`, `interrupt()`, daemon thread | `MarketplaceMonitorThread`, `Main.java` |
+| | `ExecutorService` | Request pool (8) and order pool (4) in `Main.java` |
+| | `Callable`, `Future` | `OrderProcessor`, `MarketplaceService.purchase()` |
+| | `synchronized` | `completePurchase()`, `register()`, `createListing()`, repository |
 | | `volatile`, `AtomicInteger` | `Listing.status`, monitor snapshot, id counters |
-| | Graceful shutdown | Shutdown hook: `shutdown()`, `awaitTermination()` |
+| | Shutdown hook | `shutdown()` and `awaitTermination()` in `Main.java` |
 
----
+The most important part for us was the purchase. Each purchase is sent as an `OrderProcessor` (a `Callable`) to the order pool, and `completePurchase()` is `synchronized`. So when two threads try to buy the same listing, the second one sees it is already sold and gets a 409 Conflict.
 
-## 11. Testing
+## 11. How to run
 
-| Test | Method | Result |
-|---|---|---|
-| Every API endpoint (success and error cases) | curl | Correct responses and status codes |
-| Invalid input (blank title, negative price, wrong JSON, duplicate e-mail) | curl | 400 / 409 with clear messages |
-| Blocked user tries to log in or buy | curl | 403 Forbidden |
-| **Race condition**: 3 buyers buy the same item at the same moment | Parallel requests | Exactly **1 success, 2 × 409 "already sold"**; server log shows different worker threads |
-| Large image upload (6 MB) | curl | Stored and returned correctly |
-| Full flow in the browser (login → browse → cart → purchase request) | Manual | Requests reach the Java backend; data updates |
-| Backend switched off | Manual | Frontend shows "Backend: offline" and keeps working from localStorage |
-| Frontend build and lint | `npm run build`, `npm run lint` | Pass |
+You need JDK 21 and Node.js (v20 or newer).
 
----
+1. Backend: open a terminal, `cd backend`, then run `.\run.bat` on Windows or `sh run.sh` on macOS/Linux. It starts on http://localhost:8080 and http://localhost:8080/api/health should return `{"status":"ok"}`.
+2. Frontend: open a second terminal, `cd frontend`, then `npm install` (first time only) and `npm run dev`.
+3. Open http://localhost:5173. The top bar should say "Backend: online".
 
-## 12. Limitations and Future Scope
+Demo accounts (password for all is `password123`):
+- Buyer: `ananya@campus.edu`
+- Seller: `aarav@campus.edu`
+- Admin: `nikhilpartapsingh@gmail.com`
 
-| Current limitation | Planned improvement |
-|---|---|
-| Data is saved to text files (simple, but the whole file is rewritten on every change) | Store data in **MySQL using JDBC** (`PreparedStatement`, transactions) |
-| Passwords are stored as plain text | Password hashing (e.g. BCrypt) |
-| No session token — the frontend sends the user id | Token-based authentication |
-| Filtering and statistics use loops | Rewrite with **Streams and lambdas** (`filter`, `sorted`, `Collectors.groupingBy`) |
-| No notifications | Producer–consumer queue with `wait()` / `notifyAll()` for order notifications |
+Data stays in `backend/data/` after you stop the server with Ctrl+C. To go back to the demo data, stop the backend and delete the `backend/data` folder. More details are in `README.md`.
 
----
+## 12. Current status and testing
 
-## 13. Conclusion
+The backend and frontend both work and are connected. We tested it like this:
 
-Campus Marketplace solves a real campus problem with a simple, layered full-stack application. The Java backend applies every major unit covered so far — OOP, Strings, Exceptions, Collections, Multithreading and File Handling — in a practical way. In particular, the thread pool, `Callable`/`Future` order processing and `synchronized` locking make sure the system stays correct when many students use it at the same time. Data is saved to files, so it survives restarts. The design is ready to grow with the remaining syllabus (JDBC, Streams).
+- Called every API endpoint with curl, for both normal and error cases, and got the expected responses and status codes.
+- Sent bad input (blank title, negative price, broken JSON, duplicate e-mail) and got 400 or 409 with a clear message.
+- A blocked user trying to log in or buy gets 403 Forbidden.
+- Race condition test: 3 buyers buy the same item at the same moment using parallel requests. Exactly 1 succeeded and the other 2 got 409 "already sold". The server log showed different worker threads handling them.
+- A 6 MB image upload was stored and returned correctly.
+- In the browser we went through login, browsing, cart and purchase request, and the data updated on the Java backend.
+- With the backend switched off, the frontend showed "Backend: offline" and kept working from localStorage.
+- `npm run build` and `npm run lint` pass for the frontend.
 
-**How to run:** see `README.md`.
+## 13. Limitations and pending work
+
+- Data is in text files and the whole file is rewritten on each change. We plan to move it to MySQL using JDBC (`PreparedStatement`, transactions).
+- Passwords are stored as plain text. Hashing (like BCrypt) should be added.
+- There is no session token, the frontend just sends the user id. Token-based login is pending.
+- Filtering and statistics use normal loops. We want to rewrite them with Streams and lambdas once we cover them.
+- No notifications yet. One idea is a producer-consumer queue using `wait()` / `notifyAll()`.
+
+## 14. Conclusion
+
+We built a buy and sell app for our campus with a React frontend and a Java backend. The backend uses most of what we studied in this course, mainly OOP, exceptions, collections, file handling and threads. The hardest part was making sure one item is not sold twice, which we solved with a thread pool and a synchronized purchase method. Next we want to add JDBC and Streams after we study them.
