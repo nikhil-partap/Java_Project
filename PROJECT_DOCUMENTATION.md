@@ -71,7 +71,8 @@ Students who are leaving hostels or moving to the next year often have useful it
 | **`com.sun.net.httpserver.HttpServer`** | `Main.java`, `http/Router.java` | Built-in JDK web server to expose the REST API on port 8080 |
 | **REST + JSON** | `http/Router.java` (routes), `http/Json.java` | Standard way for the frontend and backend to talk |
 | **Hand-written JSON parser/writer** | `http/Json.java` | Converts JSON text ↔ Java Maps/Lists without any library (uses recursion and `StringBuilder`) |
-| **Collections Framework** | `repository/InMemoryRepository.java`, `service/MarketplaceService.java` | In-memory storage of users, listings, purchases |
+| **Collections Framework** | `repository/InMemoryRepository.java`, `service/MarketplaceService.java` | Working storage of users, listings, purchases while the server runs |
+| **File handling** (`File`, `FileReader`/`BufferedReader`, `FileWriter`/`BufferedWriter`) | `storage/FileStorage.java`, `toFields()`/`fromFields()` in every model | Saves all data to text files in `backend/data/` after every change and loads it on startup, so nothing is lost on restart |
 | **`java.util.concurrent`** (ExecutorService, Callable, Future, AtomicInteger, ConcurrentHashMap) | `Main.java`, `service/MarketplaceService.java`, `thread/OrderProcessor.java` | Handle many requests and orders in parallel, safely |
 | **Threads** (extends Thread, daemon, sleep, interrupt) | `thread/MarketplaceMonitorThread.java` | Background thread that refreshes live statistics every 3 seconds |
 | **`java.time`** | `model/BaseEntity.java`, `model/Listing.java` | Timestamps (ISO-8601) and "newest first" sorting |
@@ -127,6 +128,9 @@ Students who are leaving hostels or moving to the next year often have useful it
 │           │                                  │
 │  Repository<T>  →  InMemoryRepository<T>     │
 │   (ArrayList + ConcurrentHashMap)            │
+│           │                                  │
+│  FileStorage  →  backend/data/*.txt          │
+│   (save after every change, load on start)   │
 │                                              │
 │  MarketplaceMonitorThread (daemon)           │
 │   → recomputes statistics every 3 s          │
@@ -137,6 +141,7 @@ Students who are leaving hostels or moving to the next year often have useful it
 - **HTTP layer** (`http/`) — understands URLs, methods and JSON only.
 - **Service layer** (`service/`) — all business rules (who can buy, valid prices, duplicate e-mails).
 - **Repository layer** (`repository/`) — stores and finds objects. Because the service only uses the `Repository<T>` interface, the in-memory storage can later be replaced by a **database (JDBC)** without changing the service.
+- **Storage layer** (`storage/`) — `FileStorage` writes the collections to text files and reads them back on startup (file persistence).
 - **Model layer** (`model/`) — the data classes.
 
 ---
@@ -147,6 +152,7 @@ Students who are leaving hostels or moving to the next year often have useful it
 Java_Project/
 ├── backend/
 │   ├── run.bat / run.sh                 compile + run
+│   ├── data/                            saved data (created on first run, not in git)
 │   └── src/com/campusmarketplace/
 │       ├── Main.java                    starts server, thread pools, monitor, shutdown hook
 │       ├── http/
@@ -158,6 +164,8 @@ Java_Project/
 │       ├── repository/
 │       │   ├── Repository.java          generic interface
 │       │   └── InMemoryRepository.java  collection-based implementation
+│       ├── storage/
+│       │   └── FileStorage.java         saves/loads data to text files (file handling)
 │       ├── model/
 │       │   ├── BaseEntity.java          abstract parent class
 │       │   ├── User.java
@@ -246,7 +254,9 @@ Errors are returned as `{"error": "message"}` with the proper HTTP status (400, 
 | **Exception Handling (10–15)** | Custom checked exceptions | `exception/` package |
 | | `throw` / `throws` / propagation | Service methods throw; `Router.handle()` catches centrally |
 | | try / catch / finally, multi-catch | `Router.handle()`, `Listing.parseTime()` |
-| | try-with-resources | `Router.readBody()`, `Router.send()` |
+| | try-with-resources | `Router.readBody()`, `Router.send()`, `FileStorage` readers/writers |
+| **File Handling** | `File`, `FileReader` + `BufferedReader.readLine()`, `FileWriter` + `BufferedWriter`, `IOException` | `storage/FileStorage.java` — data saved to `backend/data/*.txt` and loaded on startup |
+| | Converting objects to/from text lines | `toFields()` (abstract in `BaseEntity`, overridden in each model) and static `fromFields()` |
 | **Collections (16–25)** | `ArrayList`, `HashSet`, `HashMap`, `LinkedHashMap`, `TreeMap`, `ConcurrentHashMap` | Repository, service, JSON, statistics |
 | | `Iterator` and safe removal | `getListings()` filter, `deleteById()` |
 | | `Comparable` / `Comparator` / `Collections.sort` | Sort listings by newest or price |
@@ -278,17 +288,16 @@ Errors are returned as `{"error": "message"}` with the proper HTTP status (400, 
 
 | Current limitation | Planned improvement |
 |---|---|
-| Data is stored in memory and resets when the server restarts | Store data in **MySQL using JDBC** (`PreparedStatement`, transactions) — only a new `Repository` implementation is needed |
+| Data is saved to text files (simple, but the whole file is rewritten on every change) | Store data in **MySQL using JDBC** (`PreparedStatement`, transactions) |
 | Passwords are stored as plain text | Password hashing (e.g. BCrypt) |
 | No session token — the frontend sends the user id | Token-based authentication |
 | Filtering and statistics use loops | Rewrite with **Streams and lambdas** (`filter`, `sorted`, `Collectors.groupingBy`) |
-| No data export | Export purchase history to **CSV** using file handling |
 | No notifications | Producer–consumer queue with `wait()` / `notifyAll()` for order notifications |
 
 ---
 
 ## 13. Conclusion
 
-Campus Marketplace solves a real campus problem with a simple, layered full-stack application. The Java backend applies every major unit covered so far — OOP, Strings, Exceptions, Collections and Multithreading — in a practical way. In particular, the thread pool, `Callable`/`Future` order processing and `synchronized` locking make sure the system stays correct when many students use it at the same time. The design is ready to grow with the remaining syllabus (JDBC, Streams, File Handling).
+Campus Marketplace solves a real campus problem with a simple, layered full-stack application. The Java backend applies every major unit covered so far — OOP, Strings, Exceptions, Collections, Multithreading and File Handling — in a practical way. In particular, the thread pool, `Callable`/`Future` order processing and `synchronized` locking make sure the system stays correct when many students use it at the same time. Data is saved to files, so it survives restarts. The design is ready to grow with the remaining syllabus (JDBC, Streams).
 
 **How to run:** see `README.md`.

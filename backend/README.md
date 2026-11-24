@@ -2,9 +2,13 @@
 
 A small REST backend for the Campus Marketplace React frontend, written in **plain Java 21**:
 no Maven/Gradle, no external libraries, no database. It uses the JDK's built-in
-`com.sun.net.httpserver.HttpServer`, a hand-written JSON parser and writer, and in-memory collections.
-All data resets when the server restarts. It starts with the same users and listings as
-`frontend/src/data/seedState.js`, and every seed user's password is `password123`.
+`com.sun.net.httpserver.HttpServer`, a hand-written JSON parser and writer, and collections.
+
+**Saving data (file handling):** every change is written to text files in `backend/data/`
+(`users.txt`, `listings.txt`, `requests.txt`, `purchases.txt` — one record per line, fields separated by `|`),
+and they are loaded again on startup. On the very first run (no `data/` folder) it starts with the same
+users and listings as `frontend/src/data/seedState.js`; every seed user's password is `password123`.
+Delete the `data/` folder to reset to the demo data. See `storage/FileStorage.java`.
 
 ## How to run
 

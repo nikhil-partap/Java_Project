@@ -2,6 +2,7 @@ package com.campusmarketplace;
 
 import com.campusmarketplace.http.Router;
 import com.campusmarketplace.service.MarketplaceService;
+import com.campusmarketplace.storage.FileStorage;
 import com.campusmarketplace.thread.MarketplaceMonitorThread;
 import com.sun.net.httpserver.HttpServer;
 
@@ -35,7 +36,8 @@ public class Main {
         // Separate pool where OrderProcessor (Callable) purchase jobs run.
         ExecutorService orderPool = Executors.newFixedThreadPool(4);
 
-        MarketplaceService service = new MarketplaceService(orderPool);
+        // FILE HANDLING: data is saved in the "data" folder next to run.bat.
+        MarketplaceService service = new MarketplaceService(orderPool, new FileStorage("data"));
 
         MarketplaceMonitorThread monitor = new MarketplaceMonitorThread(service, MONITOR_INTERVAL_MS);
         System.out.println("Monitor thread state before start(): " + monitor.getState()); // NEW

@@ -25,6 +25,16 @@ public class BuyerRequest extends BaseEntity {
     public String getBuyerId() { return buyerId; }
 
     @Override
+    public String[] toFields() {
+        return new String[] {getId(), buyerId, message, String.valueOf(offerPrice), status, createdAt};
+    }
+
+    /** Rebuilds a request from requests.txt (WRAPPER parsing: Double.parseDouble). */
+    public static BuyerRequest fromFields(String[] f) {
+        return new BuyerRequest(f[0], f[1], f[2], Double.parseDouble(f[3]), f[4], f[5]);
+    }
+
+    @Override
     public Map<String, Object> toMap() {
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("id", getId());

@@ -31,6 +31,12 @@ public abstract class BaseEntity {
     /** Field-name -> value map used by the JSON writer (names match the frontend). */
     public abstract Map<String, Object> toMap();
 
+    /**
+     * FILE HANDLING: the values written to one line of the data file (see FileStorage).
+     * Each subclass also has a static fromFields(String[]) that rebuilds the object.
+     */
+    public abstract String[] toFields();
+
     /** STATIC utility method: current time as ISO-8601 text. */
     public static String nowIso() {
         return ISO.format(Instant.now());

@@ -4,7 +4,7 @@ A campus buy/sell marketplace with a **React frontend** and a **plain Java 21 ba
 
 | Folder / File | What it is |
 |---|---|
-| `backend/` | Java REST API (built-in `HttpServer`, in-memory collections, threads). See `backend/README.md` for endpoints. |
+| `backend/` | Java REST API (built-in `HttpServer`, collections, threads, file handling — data saved in `backend/data/`). See `backend/README.md` for endpoints. |
 | `frontend/` | React + Vite + Redux UI. Talks to the backend through `/api` (Vite proxy to port 8080). Falls back to localStorage if the backend is not running. |
 | `src/`, `lib/` | Earlier console version of the marketplace (multithreading demo). |
 | `PROJECT_DOCUMENTATION.md` | What the project is, technologies used and where, architecture, features. |
@@ -56,7 +56,9 @@ All passwords are `password123`.
 | `nikhilpartapsingh@gmail.com` | Admin |
 
 ### Stopping
-Press `Ctrl+C` in both terminals. Restarting the backend resets all data to the demo listings (data is kept in memory).
+Press `Ctrl+C` in both terminals. Your data is **saved to text files** in `backend/data/`, so it is still there after a restart.
+
+**Reset to the demo data:** stop the backend, delete the `backend/data` folder, and start it again.
 
 ### Troubleshooting
 | Problem | Fix |
@@ -65,13 +67,14 @@ Press `Ctrl+C` in both terminals. Restarting the backend resets all data to the 
 | Top bar says **Backend: offline** | The backend terminal isn't running or showed an error — check it |
 | "Address already in use" / port busy | An old copy is still running — close the old terminal (or restart the PC) |
 | `npm` is not recognized | Install Node.js and reopen the terminal |
+| Data looks wrong / want a fresh start | Stop the backend and delete the `backend/data` folder |
 
 ---
 
 ## Course topics covered (lectures 1–27+)
 
 OOP (abstract class, inheritance, interface, polymorphism), Strings/StringBuilder, wrapper parsing,
-custom exceptions with a central error handler, Collections (List/Set/Map/TreeMap, Comparator sorting, Iterator),
+custom exceptions with a central error handler, File handling (data saved to text files with `BufferedReader`/`BufferedWriter`), Collections (List/Set/Map/TreeMap, Comparator sorting, Iterator),
 and Multithreading (thread pool `ExecutorService`, `Callable`/`Future`, `synchronized` purchase to stop
 race conditions, a daemon monitor thread with `sleep`/`interrupt`, `AtomicInteger`, shutdown hook).
 Full details: `PROJECT_DOCUMENTATION.md`.

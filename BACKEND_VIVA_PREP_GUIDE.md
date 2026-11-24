@@ -1,7 +1,7 @@
 # 🎓 Campus Marketplace — Backend Viva Preparation Guide
 **Course / Subject**: Programming in Java (25CSE0202)  
 **Project Name**: Campus Marketplace (Peer-to-Peer Student Trading Platform)  
-**Backend Technologies**: Plain Java 21 (JDK only), `com.sun.net.httpserver.HttpServer`, in-memory Collections, `java.util.concurrent`  
+**Backend Technologies**: Plain Java 21 (JDK only), `com.sun.net.httpserver.HttpServer`, Collections, `java.util.concurrent`, file handling (`java.io`)  
 **Syllabus covered**: Lectures 1–27+ (OOP, Strings, Exceptions, Collections, Multithreading)
 
 ---
@@ -11,11 +11,11 @@
 2. [How One Request Flows Through the Code](#2-how-one-request-flows-through-the-code)
 3. [File-by-File Walkthrough](#3-file-by-file-walkthrough)
 4. [Course Concepts → Where They Are in the Code](#4-course-concepts--where-they-are-in-the-code)
-   - OOP · Strings & Wrappers · Exceptions · Collections · Multithreading
+   - OOP · Strings & Wrappers · Exceptions · Collections · Multithreading · File Handling
 5. [The Race Condition — Explained and Demonstrated](#5-the-race-condition--explained-and-demonstrated)
 6. [REST API Reference](#6-rest-api-reference)
 7. [Live Demo Script (5 minutes)](#7-live-demo-script-5-minutes)
-8. [Top 30 Viva Questions & Model Answers](#8-top-30-viva-questions--model-answers)
+8. [Top 35 Viva Questions & Model Answers](#8-top-35-viva-questions--model-answers)
 9. [Known Limitations & Future Work (say these honestly)](#9-known-limitations--future-work)
 
 ---
@@ -27,7 +27,7 @@ The React frontend shows the marketplace. The **Java backend is the "single sour
 
 ### Why no Spring Boot / no database?
 - The course requires **core Java**; a framework would hide the concepts we must show (threads, collections, exceptions).
-- JDBC is taught **after** multithreading (lectures 34+), so data is kept **in memory** in Collections. The `Repository<T>` interface means a database version can be plugged in later without touching the service (see Q27).
+- Data is kept in Collections while the server runs and **saved to text files** (`backend/data/`) after every change, so it survives a restart. File handling needs no database install and no driver jar, so the project still runs with just `javac` + `java`. JDBC could be added later behind the same `Repository<T>` interface (see Q27).
 - Zero external jars → runs with just `javac` + `java`.
 
 ### Layered Architecture
@@ -79,6 +79,7 @@ The React frontend shows the marketplace. The **Java backend is the "single sour
 | `model` | `BaseEntity`, `User`, `Listing`, `BuyerRequest`, `Purchase` | Data classes |
 | `exception` | `ApiException` + 5 subclasses | Errors with HTTP status codes |
 | `thread` | `OrderProcessor.java`, `MarketplaceMonitorThread.java` | Callable order job, daemon stats thread |
+| `storage` | `FileStorage.java` | Saves data to text files and loads it on startup |
 
 21 files, ~1,700 lines. Run with `backend\run.bat` → http://localhost:8080/api/health.
 
@@ -154,6 +155,16 @@ The React frontend shows the marketplace. The **Java backend is the "single sour
 - `deleteById` uses an explicit `Iterator` and `it.remove()`.
 - `findAll()` returns `Collections.unmodifiableList(new ArrayList<>(items))` → read-only snapshot.
 - Methods touching the `ArrayList` are `synchronized` (ArrayList itself is not thread-safe).
+
+### `storage/FileStorage.java` — saving data to files
+- Four files in `backend/data/`: `users.txt`, `listings.txt`, `requests.txt`, `purchases.txt`. **One record per line, fields separated by `|`**, e.g.
+  `l1|u1|Study Table|Furniture|2400.0|Good|...|Pending|2026-08-20T09:30:00.000Z|...`
+- **Writing**: `saveAll()` → `new BufferedWriter(new FileWriter(file))` in **try-with-resources**, `write(line)` + `newLine()`. It is `synchronized` so two threads never write the same file at once.
+- **Reading**: `new BufferedReader(new FileReader(file))`, `while ((line = reader.readLine()) != null)`, then `line.split("\\|", -1)` (`-1` keeps empty fields at the end).
+- **Escaping** (`escape()` / `unescape()`): a title like `Calc, Book | v2` would break the format, so `|` → `\p`, `,` → `\c`, newline → `\n`, `\` → `\\`. Unescape reads the text **char by char** with a `StringBuilder`.
+- **Polymorphism + generics**: `writeEntities(String file, List<? extends BaseEntity> items)` calls `item.toFields()` — works for any entity. Each model has `toFields()` (abstract in `BaseEntity`) and a static `fromFields(String[])` that uses `Double.parseDouble` / `Boolean.parseBoolean` (wrappers).
+- **Exceptions**: a bad line (e.g. missing field → `ArrayIndexOutOfBoundsException`, bad price → `NumberFormatException`) is **skipped with a message**, the rest still loads. If the files can't be read at all (`IOException`), the service starts with the demo data.
+- **When is it called?** `MarketplaceService` loads in its constructor (or seeds + saves on the first run) and calls a private `save()` at the end of every method that changes data (register, update user, block, create/edit/delete listing, request, purchase).
 
 ### `service/MarketplaceService.java` — the brain
 | Method | What to say |
@@ -276,6 +287,16 @@ The React frontend shows the marketplace. The **Java backend is the "single sour
 | Graceful shutdown | `shutdown()`, `awaitTermination()`, `shutdownNow()` in the shutdown hook |
 | Thread-safe collection | `ConcurrentHashMap` |
 
+### F. File Handling (see `storage/FileStorage.java`)
+| Concept | Where |
+|---|---|
+| `File`, `exists()`, `mkdirs()` | `FileStorage.hasSavedData()`, `saveAll()` creates `data/` |
+| `FileWriter` + `BufferedWriter`, `newLine()` | `FileStorage.writeLines()` |
+| `FileReader` + `BufferedReader.readLine()` | `FileStorage.readRecords()` |
+| try-with-resources (auto close) | Both reader and writer |
+| `IOException` (checked) | `saveAll()` / `loadUsers()` declare `throws IOException`; `MarketplaceService` catches it |
+| Object ↔ text line | `toFields()` / `fromFields()` in every model |
+
 ---
 
 ## 5. The Race Condition — Explained and Demonstrated
@@ -362,11 +383,12 @@ Every error body is `{"error": "message"}`. Unknown path → 404, wrong method �
 6. **Add to cart → Submit Purchase Inquiries** → `POST /api/listings/l3/requests -> 200`; the listing becomes **Pending**.
 7. **Race demo** (Section 5) → one 200, two 409, different order-pool thread names.
 8. **Stats**: http://localhost:8080/api/stats → `monitorThread: "MarketplaceMonitor (TIMED_WAITING, daemon=true)"`, category counts sorted (TreeMap).
-9. **Stop backend** (Ctrl+C) → shutdown hook prints `Shutting down...` / `interrupted, stopping.` / `Bye.` Refresh frontend → **Backend: offline**, app still works from localStorage (graceful fallback).
+9. **File handling**: open `backend\data\listings.txt` in Notepad — every listing is one line. Create a listing in the app, open the file again → the new line is there.
+10. **Stop backend** (Ctrl+C) → shutdown hook prints `Shutting down...` / `interrupted, stopping.` / `Bye.` Refresh frontend → **Backend: offline**, app still works from localStorage (graceful fallback). Start the backend again → console shows `Loaded ... from ...\data` and your new listing is still there.
 
 ---
 
-## 8. Top 30 Viva Questions & Model Answers
+## 8. Top 35 Viva Questions & Model Answers
 
 ### Architecture
 **Q1: Why did you build the backend without Spring Boot?**  
@@ -464,12 +486,28 @@ A daemon thread is a background helper; the JVM **doesn't wait** for daemon thre
 **Q30: Why `volatile` on `snapshot` and `status`? Why `AtomicInteger` for ids?**  
 `volatile` guarantees **visibility**: a write by one thread is immediately seen by others (no stale cached value). But `count++` is three steps (read-modify-write) and not atomic even if volatile — two threads could generate the same id. `AtomicInteger.incrementAndGet()` does it atomically using CPU compare-and-swap, without locks.
 
+### File Handling
+**Q31: How is data saved? Why files and not JDBC?**
+`FileStorage` writes users, listings, requests and purchases to four text files in `backend/data/` after every change, and reads them back on startup. Files need no database server or driver jar, so the project still runs with only `javac` + `java`. The service uses the `Repository<T>` interface, so a JDBC version could be added later.
+
+**Q32: Why `BufferedReader`/`BufferedWriter` instead of plain `FileReader`/`FileWriter`?**
+Buffering reads/writes a big chunk at a time instead of one character at a time (much fewer disk operations), and `BufferedReader.readLine()` gives us one record per call.
+
+**Q33: What if a title contains `|` or a comma?**
+`escape()` replaces them with codes (`\p`, `\c`) before writing, and `unescape()` turns them back when reading, so the separator never appears inside a value.
+
+**Q34: What if the file is broken?**
+Each line is parsed inside a `try/catch`: a bad line is skipped with a message and the rest still loads. If the file can't be read at all (`IOException`), the backend starts with the demo data instead of crashing.
+
+**Q35: Can two threads write the file at the same time?**
+No — `saveAll()` is `synchronized`, and `save()` takes the snapshot and writes it inside `synchronized (storage)`, so the file always ends up with the latest data. `save()` is called only **after** leaving the `synchronized (listing)` block, so we never hold a listing lock while waiting for the storage lock (no deadlock).
+
 ### Bonus quick-fire
 - **`start()` vs `run()`?** `start()` creates a new thread that calls `run()`; calling `run()` directly runs it on the *current* thread.
 - **`sleep()` vs `wait()`?** `sleep()` keeps the lock; `wait()` releases it and must be called inside `synchronized`. We don't use `wait/notify` (lectures 32–33 come next).
 - **Why `Thread.currentThread().interrupt()` in the catch?** Catching `InterruptedException` clears the interrupt flag; we restore it so code higher up still knows the thread was interrupted.
 - **What happens if the backend is down?** The frontend's `api.js` marks it offline and falls back to localStorage, so the demo still works.
-- **Can two threads deadlock in your code?** We only ever hold one listing lock at a time and never wait for a second lock while holding it, so there is no circular wait. Java locks are reentrant, so re-locking the same listing (calling its synchronized getters inside the block) is fine.
+- **Can two threads deadlock in your code?** Locks are always taken in the same order: storage lock first, then (briefly) one listing at a time while saving. We never ask for the storage lock while holding a listing lock (`save()` runs after the `synchronized (listing)` block), so there is no circular wait. Java locks are reentrant, so re-locking the same listing (calling its synchronized getters inside the block) is fine.
 
 ---
 
@@ -478,12 +516,11 @@ Be ready to say these yourself — examiners appreciate honesty:
 
 | Limitation | Planned fix (upcoming syllabus) |
 |---|---|
-| Data is in memory → lost on restart | **JDBC** (lectures 34–42): `JdbcListingRepository implements Repository<Listing>` with `PreparedStatement`; service unchanged |
+| Whole data file is rewritten on every change (fine for a campus demo, slow for huge data) | **JDBC** (lectures 34–42): `JdbcListingRepository implements Repository<Listing>` with `PreparedStatement` |
 | Passwords stored as plain text | Hash with BCrypt / SHA-256 + salt |
 | No login token/session — the frontend sends `buyerId` itself | Session token or JWT checked on each request |
 | A seller can purchase their own listing | One extra `if (buyerId.equals(listing.getOwnerId())) throw new ValidationException(...)` |
 | Loops for filtering/stats | **Streams & lambdas** (lectures 43–46): `listings.stream().filter(...).sorted(...)`, `Collectors.groupingBy` |
-| No file export | **File handling** (lectures 49–54): export purchases to CSV with `BufferedWriter` |
 | Notifications | **Producer–consumer** with `wait()/notifyAll()` (lectures 32–33) for an order-notification queue |
 
 ---

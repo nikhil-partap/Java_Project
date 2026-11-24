@@ -13,8 +13,10 @@ import com.campusmarketplace.model.Purchase;
 import com.campusmarketplace.model.User;
 import com.campusmarketplace.repository.InMemoryRepository;
 import com.campusmarketplace.repository.Repository;
+import com.campusmarketplace.storage.FileStorage;
 import com.campusmarketplace.thread.OrderProcessor;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -54,15 +56,81 @@ public class MarketplaceService {
     private final AtomicInteger purchaseCounter = new AtomicInteger();
 
     private final ExecutorService orderExecutor;
+    private final FileStorage storage;
 
-    public MarketplaceService(ExecutorService orderExecutor) {
+    /**
+     * FILE HANDLING: if the data folder has saved files, load them; otherwise start
+     * from the demo data and write it to the files straight away.
+     */
+    public MarketplaceService(ExecutorService orderExecutor, FileStorage storage) {
         this.orderExecutor = orderExecutor;
-        for (User u : SeedData.users()) {
+        this.storage = storage;
+
+        List<User> startUsers = SeedData.users();
+        List<Listing> startListings = SeedData.listings();
+        List<Purchase> startPurchases = new ArrayList<>();
+        boolean loaded = false;
+        if (storage.hasSavedData()) {
+            try {
+                startUsers = storage.loadUsers();
+                startListings = storage.loadListings();
+                startPurchases = storage.loadPurchases();
+                loaded = true;
+            } catch (IOException e) {
+                System.out.println("Could not read saved data (" + e.getMessage() + "), using demo data.");
+                startUsers = SeedData.users();
+                startListings = SeedData.listings();
+                startPurchases = new ArrayList<>();
+            }
+        }
+
+        for (User u : startUsers) {
             users.add(u);
             emails.add(u.getEmail().toLowerCase());
         }
-        for (Listing l : SeedData.listings()) {
+        for (Listing l : startListings) {
             listings.add(l);
+            for (BuyerRequest r : l.getBuyerRequests()) {
+                bumpCounter(requestCounter, r.getId(), "r-"); // new request ids never repeat old ones
+            }
+        }
+        for (Purchase p : startPurchases) {
+            purchases.add(p);
+        }
+
+        if (loaded) {
+            System.out.printf("Loaded %d users, %d listings, %d purchases from %s%n",
+                    users.count(), listings.count(), purchases.count(), storage.getFolderPath());
+        } else {
+            System.out.println("No saved data found, starting with demo data.");
+            save();
+        }
+    }
+
+    /**
+     * Writes the current data to the files. Called after every change.
+     * Errors are only logged: the change already succeeded in memory.
+     * Must NOT be called while holding a listing lock (avoids a deadlock with saveAll).
+     */
+    private void save() {
+        try {
+            synchronized (storage) { // snapshot + write together, so the files hold the latest state
+                storage.saveAll(users.findAll(), listings.findAll(), purchases.findAll());
+            }
+        } catch (IOException e) {
+            System.out.println("WARNING: could not save data to files: " + e.getMessage());
+        }
+    }
+
+    /** If id looks like "r-12", makes sure the counter is at least 12. */
+    private static void bumpCounter(AtomicInteger counter, String id, String prefix) {
+        if (id != null && id.startsWith(prefix)) {
+            try {
+                int n = Integer.parseInt(id.substring(prefix.length()));
+                counter.accumulateAndGet(n, Math::max);
+            } catch (NumberFormatException ignored) {
+                // not a numbered id (e.g. "r-abc"), nothing to do
+            }
         }
     }
 
@@ -112,6 +180,7 @@ public class MarketplaceService {
                 text(body, "phone"), text(body, "department"), text(body, "year"),
                 "buyer", text(body, "bio"), "user", false);
         users.add(user);
+        save();
         return user;
     }
 
@@ -134,12 +203,14 @@ public class MarketplaceService {
         if (patch.containsKey("department")) user.setDepartment(text(patch, "department"));
         if (patch.containsKey("year")) user.setYear(text(patch, "year"));
         if (patch.containsKey("bio")) user.setBio(text(patch, "bio"));
+        save();
         return user;
     }
 
     public User toggleBlock(String id) throws ApiException {
         User user = findUser(id);
         user.toggleBlocked();
+        save();
         return user;
     }
 
@@ -209,6 +280,7 @@ public class MarketplaceService {
             listing.setBuyerRequests(parseRequests(body.get("buyerRequests"), price));
         }
         listings.addFirst(listing); // newest listing shown first, like the frontend
+        save();
         return listing;
     }
 
@@ -237,6 +309,7 @@ public class MarketplaceService {
                 listing.setBuyerRequests(parseRequests(patch.get("buyerRequests"), listing.getPrice()));
             }
         }
+        save(); // outside the synchronized block
         return listing;
     }
 
@@ -244,6 +317,7 @@ public class MarketplaceService {
         if (!listings.deleteById(id)) {
             throw new NotFoundException("Listing not found: " + id);
         }
+        save();
     }
 
     public Listing addRequest(String listingId, Map<String, Object> body) throws ApiException {
@@ -260,6 +334,7 @@ public class MarketplaceService {
                 listing.setStatus("Pending");
             }
         }
+        save();
         return listing;
     }
 
@@ -304,6 +379,7 @@ public class MarketplaceService {
         if (buyer != null && buyer.isBlocked()) {
             throw new ForbiddenException("This account has been suspended by an administrator.");
         }
+        Purchase purchase;
         synchronized (listing) {
             if ("Sold".equals(listing.getStatus())) {
                 throw new ConflictException("This item has already been sold.");
@@ -314,12 +390,13 @@ public class MarketplaceService {
                 buyerId = requests.isEmpty() ? "unknown" : requests.get(0).getBuyerId();
             }
             listing.setStatus("Sold");
-            Purchase purchase = new Purchase(nextId("p-", purchaseCounter, purchases), listing.getId(),
+            purchase = new Purchase(nextId("p-", purchaseCounter, purchases), listing.getId(),
                     listing.getTitle(), listing.getPrice(), listing.getOwnerId(), buyerId,
                     BaseEntity.nowIso(), listing.getImageUrl());
             purchases.addFirst(purchase);
-            return purchase;
         }
+        save(); // after releasing the listing lock
+        return purchase;
     }
 
     public List<Purchase> getPurchases() {

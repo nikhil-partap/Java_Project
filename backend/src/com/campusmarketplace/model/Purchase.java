@@ -29,6 +29,16 @@ public class Purchase extends BaseEntity {
     public double getPrice() { return price; }
 
     @Override
+    public String[] toFields() {
+        return new String[] {getId(), listingId, title, String.valueOf(price), sellerId, buyerId,
+                purchasedAt, imageUrl};
+    }
+
+    public static Purchase fromFields(String[] f) {
+        return new Purchase(f[0], f[1], f[2], Double.parseDouble(f[3]), f[4], f[5], f[6], f[7]);
+    }
+
+    @Override
     public Map<String, Object> toMap() {
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("id", getId());
