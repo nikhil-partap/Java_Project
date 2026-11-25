@@ -9,16 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * INTERFACE IMPLEMENTATION: stores entities in memory (no database).
- * COLLECTIONS:
- *   - ArrayList keeps the display order,
- *   - ConcurrentHashMap gives fast, thread-safe lookup by id,
- *   - Iterator.remove() deletes safely while looping,
- *   - Collections.unmodifiableList hands out a read-only copy.
- * MULTITHREADING: methods that touch the list are synchronized because many HTTP
- * worker threads use the same repository at once.
- */
+/** Thread-safe in-memory repository using ArrayList and ConcurrentHashMap. */
 public class InMemoryRepository<T extends BaseEntity> implements Repository<T> {
 
     private final List<T> items = new ArrayList<>();
@@ -31,17 +22,8 @@ public class InMemoryRepository<T extends BaseEntity> implements Repository<T> {
     }
 
     @Override
-    public synchronized void addFirst(T item) {
-        items.add(0, item);
-        index.put(item.getId(), item);
-    }
-
-    @Override
     public T findById(String id) {
-        if (id == null) {
-            return null; // ConcurrentHashMap does not allow null keys
-        }
-        return index.get(id);
+        return id == null ? null : index.get(id);
     }
 
     @Override
@@ -54,7 +36,7 @@ public class InMemoryRepository<T extends BaseEntity> implements Repository<T> {
         Iterator<T> it = items.iterator();
         while (it.hasNext()) {
             if (it.next().getId().equals(id)) {
-                it.remove(); // ITERATOR REMOVAL: no ConcurrentModificationException
+                it.remove();
                 index.remove(id);
                 return true;
             }

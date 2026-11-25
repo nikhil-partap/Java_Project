@@ -6,14 +6,9 @@ import com.campusmarketplace.service.MarketplaceService;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * MULTITHREADING - CALLABLE: unlike Runnable, a Callable RETURNS a value (the Purchase)
- * and may THROW an exception. It is submitted to an ExecutorService and the caller
- * reads the result through a Future.
- */
+/** Callable worker task that executes a single purchase on the order thread pool. */
 public class OrderProcessor implements Callable<Purchase> {
 
-    // STATIC + ATOMICINTEGER: one counter shared by all OrderProcessor objects/threads.
     private static final AtomicInteger ORDERS_PROCESSED = new AtomicInteger();
 
     private final MarketplaceService service;
@@ -32,13 +27,11 @@ public class OrderProcessor implements Callable<Purchase> {
         try {
             Purchase purchase = service.completePurchase(listingId, buyerId);
             int total = ORDERS_PROCESSED.incrementAndGet();
-            System.out.println(String.format("[%s] order OK   listing=%s buyer=%s (orders so far: %d)",
-                    thread, listingId, buyerId, total));
+            System.out.printf("[%s] Order OK   listing=%s buyer=%s (total: %d)%n", thread, listingId, buyerId, total);
             return purchase;
         } catch (Exception e) {
-            System.out.println(String.format("[%s] order FAIL listing=%s buyer=%s -> %s",
-                    thread, listingId, buyerId, e.getMessage()));
-            throw e; // re-throw: Future.get() will wrap it in an ExecutionException
+            System.out.printf("[%s] Order FAIL listing=%s buyer=%s -> %s%n", thread, listingId, buyerId, e.getMessage());
+            throw e;
         }
     }
 
