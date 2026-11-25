@@ -1,0 +1,435 @@
+================================================================================
+CAMPUS MARKETPLACE - COMPLETE CODE EXPLANATION & VIVA PREPARATION GUIDE
+Course: Programming in Java (25CSE0202)
+Language: Pure Java 21 (No external frameworks or libraries)
+Files: Models.java | FileStorage.java | MarketplaceService.java | Main.java
+================================================================================
+
+TABLE OF CONTENTS:
+1. 30-Second Elevator Pitch (What to say when asked to introduce the project)
+2. How the 4 Files Work Together (High-Level Architecture)
+3. Step-by-Step Code Walkthrough (Every File & Every Function Explained)
+   - File 1: Models.java
+   - File 2: FileStorage.java
+   - File 3: MarketplaceService.java
+   - File 4: Main.java
+4. How Data is Fetched, Processed, and Saved
+5. Top 10 Viva Questions with Exact Model Answers
+6. Demo Cheat-Sheet (Step-by-step inputs to show in viva)
+
+================================================================================
+1. 30-SECOND ELEVATOR PITCH
+================================================================================
+When the examiner asks: "Tell me about your project in 30 seconds."
+
+Say:
+"Campus Marketplace is a console-based peer-to-peer buy and sell application 
+designed for college students. It allows students to create accounts, browse 
+and search used goods (books, cycles, electronics, furniture), post items for 
+sale, and send purchase requests with meetup messages. Sellers review incoming 
+requests on their items and choose which buyer to accept.
+
+Under the hood, the project is built in pure Java without external libraries. 
+It uses:
+1. Object-Oriented Programming (encapsulation and Comparable interfaces)
+2. Collections Framework (ArrayList, HashSet)
+3. File I/O (BufferedReader, BufferedWriter with try-with-resources)
+4. Multithreading (ExecutorService thread pool, AtomicInteger, and synchronized 
+   object-level locking to prevent two buyers from buying the same item at the 
+   exact same millisecond)."
+
+
+================================================================================
+2. HOW THE 4 FILES WORK TOGETHER (ARCHITECTURE)
+================================================================================
+
+Our project is divided cleanly into 4 files inside "backend/src/com/campusmarketplace/":
+
+1. Main.java (The User Interface & Driver)
+   - Handles the console menus, user keyboard inputs via Scanner, and formatted printing.
+   - Manages the lifecycle of background worker threads (ExecutorService).
+   - Calls methods in MarketplaceService to do all the real work.
+
+2. MarketplaceService.java (The Business Logic Engine)
+   - Contains all the validation logic (login credentials, duplicate email checks, 
+     preventing users from buying their own items).
+   - Stores data in memory (List of users, listings, requests, purchases).
+   - Coordinates thread-safe sales transactions.
+   - Tells FileStorage when to save data to disk.
+
+3. Models.java (The Data Structures)
+   - Contains 4 simple data classes: User, Listing, PurchaseRequest, Purchase.
+   - Encapsulates private fields with getters.
+   - Provides methods to convert objects to text lines (toLine) and from text lines (fromLine).
+
+4. FileStorage.java (The Persistence Layer)
+   - Reads and writes plain text files in the "backend/data/" folder:
+     * users.txt (User accounts)
+     * listings.txt (Items posted for sale)
+     * requests.txt (Buyer requests waiting for seller approval)
+     * purchases.txt (Completed sale receipts)
+   - Uses BufferedReader and BufferedWriter with try-with-resources so files are 
+     always closed safely.
+
+
+================================================================================
+3. STEP-BY-STEP CODE WALKTHROUGH
+================================================================================
+
+--------------------------------------------------------------------------------
+FILE 1: Models.java (Data Entities)
+--------------------------------------------------------------------------------
+This file defines the 4 core models of the application.
+
+A. Class "User"
+   Fields:
+   - id: Unique user ID (e.g., "u1", "u2").
+   - name: Full student name.
+   - email: Student email.
+   - password: Login password.
+   - department: Student's department (e.g., CSE, Design, Commerce).
+
+   Key Methods:
+   - checkPassword(pass): Returns true if the entered password matches.
+     * VIVA POINT: Notice there is NO getPassword() method! We deliberately hide 
+       the plain text password so other parts of the code cannot accidentally 
+       expose it. This is a classic OOP Encapsulation principle.
+   - toLine(): Converts the user object into a pipe-delimited text line:
+     "u1|Aarav Mehta|aarav@campus.edu|password123|CSE"
+   - fromLine(f): Static factory method that takes a split string array and 
+     reconstructs a User object.
+
+B. Class "Listing" (implements Comparable<Listing>)
+   Fields:
+   - id: Unique item ID (e.g., "l1", "l2").
+   - ownerId: The user ID of the student selling the item.
+   - title: Name of the item (e.g., "Study Table").
+   - category: Category (Books, Cycles, Electronics, Furniture, Lab Gear).
+   - price: Price in INR.
+   - location: Where on campus to meet (e.g., "Hostel Block A").
+   - volatile String status: Can be "Available" or "Sold".
+     * VIVA POINT: Why is status marked 'volatile'?
+       In Java, different CPU threads can cache variable values. Marking status as 
+       'volatile' guarantees memory visibility: the moment a background thread 
+       marks an item as "Sold", all other threads instantly see the update in main 
+       memory.
+
+   Key Methods:
+   - compareTo(Listing o):
+     Returns "o.id.compareTo(this.id)". This sorts listings newest-first by default.
+
+C. Class "PurchaseRequest"
+   Fields:
+   - id: Unique request ID (e.g., "r1").
+   - listingId: The ID of the item the buyer wants.
+   - buyerId: The user ID of the student who wants to buy it.
+   - note: Optional meetup message (e.g., "Can I inspect it at 5pm?").
+   - createdAt: Date and time the request was submitted.
+
+D. Class "Purchase"
+   Fields:
+   - id: Unique receipt ID (e.g., "p1").
+   - listingId, title, price, sellerId, buyerId, purchasedAt.
+   * VIVA POINT: Why do we store title and price again in Purchase?
+     Because a receipt must be an immutable snapshot. Even if the seller later 
+     deletes or changes the original listing, the historical financial receipt 
+     remains permanently accurate.
+
+
+--------------------------------------------------------------------------------
+FILE 2: FileStorage.java (Reading and Writing Disk Files)
+--------------------------------------------------------------------------------
+This file handles disk operations so data persists across restarts.
+
+Key Methods:
+1. hasData():
+   - Checks if "backend/data/users.txt" exists.
+   - Used during startup to decide whether to load existing data or create initial demo seed data.
+
+2. saveAll(users, listings, requests, purchases):
+   - Marked 'synchronized' so two threads can never write to files simultaneously.
+   - If the "data/" directory doesn't exist, it calls "folder.mkdirs()" to create it.
+   - Calls writeFile() for all 4 files.
+
+3. writeFile(fileName, lines):
+   - Uses:
+     try (BufferedWriter bw = new BufferedWriter(new FileWriter(new File(folder, fileName)))) {
+         for (String line : lines) {
+             bw.write(line);
+             bw.newLine();
+         }
+     }
+   - VIVA POINT: What is try-with-resources?
+     The parentheses inside "try (...)" guarantee that "bw.close()" is called 
+     automatically when the block finishes, even if an error occurs. This 
+     prevents memory and file leaks.
+   - VIVA POINT: Why BufferedWriter?
+     FileWriter writes characters one-by-one to disk, which is very slow. 
+     BufferedWriter buffers characters in RAM and writes them in chunks, which 
+     is much faster.
+
+4. readLines(fileName):
+   - Opens BufferedReader and reads line-by-line using a while loop:
+     while ((line = br.readLine()) != null)
+   - Splits each line using: line.split("\\|", -1)
+   - VIVA POINT: Why "\\|" and not "|"?
+     In Java String.split(), the delimiter is a regular expression. In regex, 
+     "|" means OR. If you write split("|"), it splits between every single character! 
+     We must write "\\|" to escape it and match the literal pipe character.
+   - VIVA POINT: Why "-1"?
+     The -1 parameter tells Java not to discard empty trailing fields (e.g., if a 
+     meetup note was left blank).
+
+5. clean(String s):
+   - Replaces any "|" with "/" in user inputs to prevent corrupting the file structure.
+
+
+--------------------------------------------------------------------------------
+FILE 3: MarketplaceService.java (The Brain / Controller)
+--------------------------------------------------------------------------------
+Contains all business rules, in-memory collections, and thread concurrency.
+
+Fields:
+- users, listings, requests, purchases: ArrayLists holding data in memory.
+- emails: A HashSet<String> holding all registered emails.
+  * VIVA POINT: Why HashSet instead of ArrayList for emails?
+    Checking if an email exists in an ArrayList takes O(n) linear time (it has 
+    to check every user one by one). A HashSet uses hashing and checks for 
+    duplicates in O(1) constant time, making registration instant even with thousands of users.
+- userSeq, listingSeq, requestSeq, purchaseSeq: AtomicInteger objects.
+  * VIVA POINT: Why AtomicInteger instead of int count++?
+    "count++" is not thread-safe because it takes 3 operations: read, increment, 
+    write. In multithreading, two threads can increment at the same time and get 
+    the same number. AtomicInteger.incrementAndGet() uses hardware-level atomic 
+    instructions (Compare-And-Swap) to guarantee unique IDs without slow locking.
+
+Key Methods:
+1. initData():
+   - Called when program starts.
+   - If files exist, loads them into memory.
+   - If files do not exist, seeds 6 demo students, 10 items, 2 requests, and 1 receipt, 
+     then saves them.
+
+2. login(email, pass):
+   - Searches users list. Case-insensitive email comparison.
+   - Verifies password using u.checkPassword(pass).
+   - Throws an Exception if invalid.
+
+3. register(name, email, pass, dept):
+   - Validates that email and password are not empty.
+   - Uses "if (!emails.add(cleanEmail))" to check for duplicates in O(1) time.
+   - Generates ID "u" + userSeq.incrementAndGet(), creates User, adds to list, and saves.
+
+4. getListings(cat, keyword, sort):
+   - In-memory search: filters by category and keyword without disk access.
+   - If sort is "price_asc", sorts low to high using Comparator.comparingDouble(Listing::getPrice).
+   - If sort is "price_desc", sorts high to low using reversed comparator.
+   - By default, uses Collections.sort(list) which calls Listing.compareTo() (newest first).
+
+5. sendPurchaseRequest(listingId, buyerId, note):
+   - Checks 3 rules:
+     a) A seller cannot request their own item.
+     b) Cannot request an item that is already "Sold".
+     c) A buyer cannot send duplicate requests for the same item.
+   - Creates a PurchaseRequest ("r" + seq), adds to requests, and saves.
+
+6. getIncomingRequests(sellerId):
+   - Finds all active listings owned by the logged-in seller.
+   - Returns all pending purchase requests for those items.
+
+7. acceptRequest(requestId, sellerId):
+   - Verifies the seller is the true owner of the item.
+   - Submits the sale transaction to the background thread pool:
+     Future<Purchase> future = orderPool.submit(() -> completeSale(target, req));
+     return future.get(5, TimeUnit.SECONDS);
+
+8. completeSale(target, acceptedReq) [THE CRITICAL MULTITHREADING METHOD]:
+   - Runs inside:
+     synchronized (target) {
+         if ("Sold".equalsIgnoreCase(target.getStatus())) {
+             throw new Exception("This item has already been SOLD.");
+         }
+         target.setStatus("Sold");
+         // Creates Purchase receipt
+         // Removes other pending requests for this listing
+         // Saves to disk
+     }
+   - VIVA POINT: Why synchronize on 'target' and not the entire method?
+     If we synchronize the entire method, only ONE student in the entire university 
+     could buy anything at a time! By synchronizing on the specific Listing object 
+     ("target"), multiple students can buy DIFFERENT items at the same time, but 
+     two buyers can NEVER buy the SAME item simultaneously.
+
+
+--------------------------------------------------------------------------------
+FILE 4: Main.java (The CLI Interface)
+--------------------------------------------------------------------------------
+Handles user input, console display, and graceful shutdown.
+
+Key Methods:
+1. main(String[] args):
+   - Creates an ExecutorService with 4 background worker threads:
+     ExecutorService orderPool = Executors.newFixedThreadPool(4);
+   - Initializes FileStorage and MarketplaceService.
+   - Runs the CLI loop in a try-finally block.
+   - In the finally block:
+     orderPool.shutdown();
+     orderPool.awaitTermination(3, TimeUnit.SECONDS);
+     * VIVA POINT: Why is thread shutdown in finally?
+       To ensure that even if an unexpected crash occurs, the background worker 
+       threads are terminated gracefully and do not hang in the operating system.
+
+2. run():
+   - Displays the main menu loop.
+   - If currentUser is null, displays guestMenu() (Login, Register, Browse).
+   - If currentUser is logged in, displays userMenu() (Browse, Send Request, Sell, 
+     View Incoming Requests, Delete Listing, Purchases, Logout).
+
+3. Error Handling:
+   - The loop catches Exception and prints "[Error] message".
+   - This ensures the console program never crashes if a user makes a typo or 
+     enters an invalid item ID.
+
+
+================================================================================
+4. HOW DATA IS FETCHED, PROCESSED, AND SAVED
+================================================================================
+
+1. Reading Data (Disk -> Memory):
+   Program starts -> Main creates FileStorage -> MarketplaceService.initData() 
+   checks if "users.txt" exists -> BufferedReader opens file -> reads line -> 
+   splits with "|" -> Model.fromLine() creates Java Object -> added to ArrayList.
+
+2. Querying Data (Memory Only):
+   When you search or browse items, it queries the ArrayList in RAM. It does NOT 
+   read the disk again, making searching instantaneous.
+
+3. Writing Data (Memory -> Disk):
+   When a user registers, posts an item, sends a request, or sells an item:
+   Object added/updated in ArrayList -> MarketplaceService calls storage.saveAll() -> 
+   Model.toLine() converts objects to pipe strings -> BufferedWriter writes lines 
+   to disk files.
+
+
+================================================================================
+5. TOP 10 VIVA QUESTIONS WITH EXACT MODEL ANSWERS
+================================================================================
+
+Q1: What Java concepts did you use in this project?
+Answer:
+"We used:
+- OOP: Encapsulation (private fields, hidden passwords), Comparable interface.
+- Collections: ArrayList for dynamic records, HashSet for O(1) email lookups.
+- File I/O: BufferedReader, BufferedWriter, FileWriter, FileReader, try-with-resources.
+- Multithreading: ExecutorService thread pool, Callable, Future, AtomicInteger, 
+  volatile keyword, and synchronized blocks for race condition protection.
+- Exception Handling: try-catch blocks and throwing custom error messages."
+
+Q2: Why did you use text files instead of MySQL or a database?
+Answer:
+"We designed the project to run out-of-the-box on any computer using pure Java 
+without needing to install MySQL servers or bundle third-party JDBC drivers. 
+It directly demonstrates core Java File I/O syllabus topics. Because storage 
+is isolated in FileStorage.java, we could easily replace it with a JDBC DAO 
+in the future without rewriting any business logic."
+
+Q3: Why did you synchronize on 'target' instead of the whole method?
+Answer:
+"If we synchronized the entire method, the whole marketplace would freeze whenever 
+any user made a purchase. By synchronizing only on the specific Listing object 
+(synchronized (target)), multiple transactions on different items can run in 
+parallel, but two threads can never purchase the same item at the same time."
+
+Q4: What is the purpose of the 'volatile' keyword on Listing status?
+Answer:
+"In Java, threads can cache variables in CPU registers. Marking status as volatile 
+guarantees memory visibility: whenever a worker thread marks an item as 'Sold', 
+the new value is immediately flushed to main memory so all other threads read the 
+updated status instantly."
+
+Q5: Why did you use AtomicInteger instead of int count++?
+Answer:
+"'count++' is not atomic; it performs a read, an increment, and a write. If two 
+threads increment at the same time, a race condition can cause duplicate IDs. 
+AtomicInteger.incrementAndGet() uses hardware-level atomic operations to guarantee 
+unique sequential IDs without needing slow locks."
+
+Q6: Why is HashSet used for emails?
+Answer:
+"Checking if an email exists in an ArrayList takes O(n) linear time because it has 
+to check every single user. A HashSet uses hashing to provide O(1) constant-time 
+lookups, ensuring duplicate email checks are instantaneous even as user count grows."
+
+Q7: How does try-with-resources work in your code?
+Answer:
+"Any class implementing the AutoCloseable interface (like BufferedReader or 
+BufferedWriter) opened inside 'try (...)' is automatically closed when execution 
+exits the block, even if an exception is thrown. This guarantees no memory leaks 
+or open file handles."
+
+Q8: How does the Buyer Request / Seller Approval flow work?
+Answer:
+"In a college campus, buyers and sellers need to agree on meetup locations and 
+times. Instead of an instant buy, the buyer sends a PurchaseRequest with a note. 
+The seller opens 'View Incoming Requests', reviews the requests, and chooses 
+which buyer to accept. Accepting the request triggers the thread-safe sale, 
+marks the item as Sold, generates the receipt, and cleans up other pending requests."
+
+Q9: What happens if two buyers try to buy the same item at the same time?
+Answer:
+"Both submit requests. If the seller accepts, the sale executes in the thread pool 
+inside synchronized(target). The first thread locks the item, sets it to Sold, 
+and generates the receipt. The second thread is blocked until the lock is released. 
+When the second thread enters, target.getStatus() is already 'Sold', so it throws 
+an exception saying 'This item has already been SOLD'."
+
+Q10: How do you reset back to original demo data if data files get deleted or corrupted?
+Answer:
+"You simply delete the 'backend/data/' folder. The next time the program runs, 
+storage.hasData() returns false, which causes initData() to automatically re-seed 
+the 6 students, 10 items, 2 requests, and 1 receipt to fresh disk files."
+
+
+================================================================================
+6. DEMO CHEAT-SHEET (STEP-BY-STEP INPUTS FOR LIVE VIVA DEMO)
+================================================================================
+
+Step 1: Open Terminal in "backend/" and start the application:
+  .\run.bat   (or ./run.sh on Mac/Linux)
+
+Step 2: Browse items as a guest:
+  Type: 3
+  Evaluator sees: A clean table of 10 available campus items (Books, Cycles, Electronics, Furniture, Lab Gear).
+
+Step 3: Log in as a seller (Aarav):
+  Type: 1
+  Email: aarav@campus.edu
+  Password: password123
+  Evaluator sees: "Welcome, Aarav Mehta!"
+
+Step 4: Check incoming purchase requests:
+  Type: 4
+  Evaluator sees: Incoming request "r1" from Ananya Sharma for "Study Table with Shelf" 
+  with note: "Can I inspect the table this evening after 6pm?".
+
+Step 5: Accept the request:
+  Type: r1
+  Evaluator sees: "Request accepted! Item 'Study Table with Shelf' marked as SOLD to Ananya Sharma for INR 2200.00! (Order ID: p2)"
+
+Step 6: Check purchases & sales history:
+  Type: 6
+  Evaluator sees: Complete receipt table showing the sale to Ananya.
+
+Step 7: Post a new item for sale:
+  Type: 3
+  Item Title: Casio FX-991CW Calculator
+  Category: Electronics
+  Price: 900
+  Location: Science Block
+  Evaluator sees: "Posted listing [l11] 'Casio FX-991CW Calculator' for INR 900.00."
+
+Step 8: Logout and Exit cleanly:
+  Type: 7 (Logout)
+  Type: 0 (Exit)
+  Evaluator sees: "Goodbye!" (Thread pool shuts down cleanly with zero lag).
+================================================================================
