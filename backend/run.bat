@@ -1,8 +1,8 @@
 @echo off
-REM Compiles the console application into out\ and starts it.
+REM Compile and run Campus Marketplace console app
 cd /d "%~dp0"
 if exist out rmdir /s /q out
-javac -encoding UTF-8 -d out -sourcepath src src\com\campusmarketplace\Main.java
+javac -encoding UTF-8 -d out src\com\campusmarketplace\*.java
 if errorlevel 1 (
   echo Compilation failed.
   exit /b 1
