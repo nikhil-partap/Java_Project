@@ -11,11 +11,13 @@ class MarketplaceService {
 
     private final List<User> users = new ArrayList<>();
     private final List<Listing> listings = new ArrayList<>();
+    private final List<PurchaseRequest> requests = new ArrayList<>();
     private final List<Purchase> purchases = new ArrayList<>();
     private final Set<String> emails = new HashSet<>();
 
     private final AtomicInteger userSeq = new AtomicInteger();
     private final AtomicInteger listingSeq = new AtomicInteger();
+    private final AtomicInteger requestSeq = new AtomicInteger();
     private final AtomicInteger purchaseSeq = new AtomicInteger();
 
     private final ExecutorService orderPool;
@@ -32,6 +34,7 @@ class MarketplaceService {
         if (storage.hasData()) {
             users.addAll(storage.loadUsers());
             listings.addAll(storage.loadListings());
+            requests.addAll(storage.loadRequests());
             purchases.addAll(storage.loadPurchases());
         } else {
             // Initial seed data
@@ -53,6 +56,9 @@ class MarketplaceService {
         for (Listing l : listings) {
             listingSeq.accumulateAndGet(parseNum(l.getId(), "l"), Math::max);
         }
+        for (PurchaseRequest r : requests) {
+            requestSeq.accumulateAndGet(parseNum(r.getId(), "r"), Math::max);
+        }
         for (Purchase p : purchases) {
             purchaseSeq.accumulateAndGet(parseNum(p.getId(), "p"), Math::max);
         }
@@ -68,7 +74,7 @@ class MarketplaceService {
     }
 
     private synchronized void save() {
-        storage.saveAll(new ArrayList<>(users), new ArrayList<>(listings), new ArrayList<>(purchases));
+        storage.saveAll(new ArrayList<>(users), new ArrayList<>(listings), new ArrayList<>(requests), new ArrayList<>(purchases));
     }
 
     // Auth
@@ -137,23 +143,64 @@ class MarketplaceService {
             throw new Exception("Cannot delete an item that has already been SOLD.");
         }
 
+        String targetId = target.getId();
         listings.remove(target);
+        requests.removeIf(r -> r.getListingId().equalsIgnoreCase(targetId));
         save();
     }
 
-    // Purchases with Thread Concurrency & Synchronization
-    public Purchase buyItem(String listingId, String buyerId) throws Exception {
+    // Purchase Requests (Buyer sends request)
+    public synchronized PurchaseRequest sendPurchaseRequest(String listingId, String buyerId, String note) throws Exception {
         Listing target = findListing(listingId);
         if (target.getOwnerId().equals(buyerId)) {
-            throw new Exception("You cannot buy your own listing!");
+            throw new Exception("You cannot request to buy your own listing!");
         }
-        // Execute buy task in thread pool
-        Future<Purchase> future = orderPool.submit(() -> completePurchase(target, buyerId));
+        if ("Sold".equalsIgnoreCase(target.getStatus())) {
+            throw new Exception("This item has already been SOLD.");
+        }
+        for (PurchaseRequest r : requests) {
+            if (r.getListingId().equalsIgnoreCase(target.getId()) && r.getBuyerId().equals(buyerId)) {
+                throw new Exception("You have already sent a purchase request for this item!");
+            }
+        }
+        String cleanNote = FileStorage.clean(note);
+        if (cleanNote.isEmpty()) cleanNote = "Interested in buying";
+        PurchaseRequest req = new PurchaseRequest("r" + requestSeq.incrementAndGet(), target.getId(), buyerId, cleanNote, LocalDateTime.now().format(TIME_FMT));
+        requests.add(0, req);
+        save();
+        return req;
+    }
+
+    // View incoming requests for a seller
+    public synchronized List<PurchaseRequest> getIncomingRequests(String sellerId) {
+        Set<String> myListingIds = new HashSet<>();
+        for (Listing l : listings) {
+            if (l.getOwnerId().equals(sellerId) && "Available".equalsIgnoreCase(l.getStatus())) {
+                myListingIds.add(l.getId());
+            }
+        }
+        List<PurchaseRequest> list = new ArrayList<>();
+        for (PurchaseRequest r : requests) {
+            if (myListingIds.contains(r.getListingId())) {
+                list.add(r);
+            }
+        }
+        return list;
+    }
+
+    // Seller accepts a request -> triggers multithreaded sale transaction
+    public Purchase acceptRequest(String requestId, String sellerId) throws Exception {
+        PurchaseRequest req = findRequest(requestId);
+        Listing target = findListing(req.getListingId());
+        if (!target.getOwnerId().equals(sellerId)) {
+            throw new Exception("You can only accept requests for your own listings!");
+        }
+        Future<Purchase> future = orderPool.submit(() -> completeSale(target, req));
         return future.get(5, TimeUnit.SECONDS);
     }
 
     // Synchronized lock on the item so multiple concurrent threads cannot sell it twice
-    private Purchase completePurchase(Listing target, String buyerId) throws Exception {
+    private Purchase completeSale(Listing target, PurchaseRequest acceptedReq) throws Exception {
         Purchase p;
         synchronized (target) {
             if ("Sold".equalsIgnoreCase(target.getStatus())) {
@@ -162,8 +209,10 @@ class MarketplaceService {
             Thread.sleep(100); // simulate quick transaction
             target.setStatus("Sold");
             p = new Purchase("p" + purchaseSeq.incrementAndGet(), target.getId(), target.getTitle(), target.getPrice(),
-                    target.getOwnerId(), buyerId, LocalDateTime.now().format(TIME_FMT));
+                    target.getOwnerId(), acceptedReq.getBuyerId(), LocalDateTime.now().format(TIME_FMT));
             synchronized (this) {
+                // Remove all pending requests for this listing now that it's sold
+                requests.removeIf(r -> r.getListingId().equalsIgnoreCase(target.getId()));
                 purchases.add(0, p);
                 save();
             }
@@ -179,11 +228,18 @@ class MarketplaceService {
         return res;
     }
 
-    private synchronized Listing findListing(String id) throws Exception {
+    public synchronized Listing findListing(String id) throws Exception {
         for (Listing l : listings) {
             if (l.getId().equalsIgnoreCase(id.trim())) return l;
         }
         throw new Exception("Listing not found with ID: " + id);
+    }
+
+    private synchronized PurchaseRequest findRequest(String id) throws Exception {
+        for (PurchaseRequest r : requests) {
+            if (r.getId().equalsIgnoreCase(id.trim())) return r;
+        }
+        throw new Exception("Purchase request not found with ID: " + id);
     }
 
     public synchronized String getUserName(String userId) {

@@ -4,7 +4,7 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 
-// Simple file storage writing users.txt, listings.txt, purchases.txt in data/
+// Simple file storage writing users.txt, listings.txt, requests.txt, purchases.txt in data/
 class FileStorage {
     private final File folder;
 
@@ -16,10 +16,11 @@ class FileStorage {
         return new File(folder, "users.txt").exists();
     }
 
-    public synchronized void saveAll(List<User> users, List<Listing> listings, List<Purchase> purchases) {
+    public synchronized void saveAll(List<User> users, List<Listing> listings, List<PurchaseRequest> requests, List<Purchase> purchases) {
         if (!folder.exists()) folder.mkdirs();
         writeFile("users.txt", users.stream().map(User::toLine).toList());
         writeFile("listings.txt", listings.stream().map(Listing::toLine).toList());
+        writeFile("requests.txt", requests.stream().map(PurchaseRequest::toLine).toList());
         writeFile("purchases.txt", purchases.stream().map(Purchase::toLine).toList());
     }
 
@@ -43,6 +44,12 @@ class FileStorage {
     public List<Listing> loadListings() {
         List<Listing> list = new ArrayList<>();
         for (String[] f : readLines("listings.txt")) list.add(Listing.fromLine(f));
+        return list;
+    }
+
+    public List<PurchaseRequest> loadRequests() {
+        List<PurchaseRequest> list = new ArrayList<>();
+        for (String[] f : readLines("requests.txt")) list.add(PurchaseRequest.fromLine(f));
         return list;
     }
 

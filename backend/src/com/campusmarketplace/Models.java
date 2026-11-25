@@ -74,7 +74,38 @@ class Listing implements Comparable<Listing> {
     }
 }
 
-// Purchase record model
+// Purchase Request model (sent by buyer, approved by seller)
+class PurchaseRequest {
+    private final String id;
+    private final String listingId;
+    private final String buyerId;
+    private final String note;
+    private final String createdAt;
+
+    public PurchaseRequest(String id, String listingId, String buyerId, String note, String createdAt) {
+        this.id = id;
+        this.listingId = listingId;
+        this.buyerId = buyerId;
+        this.note = note;
+        this.createdAt = createdAt;
+    }
+
+    public String getId() { return id; }
+    public String getListingId() { return listingId; }
+    public String getBuyerId() { return buyerId; }
+    public String getNote() { return note; }
+    public String getCreatedAt() { return createdAt; }
+
+    public String toLine() {
+        return String.join("|", id, listingId, buyerId, note, createdAt);
+    }
+
+    public static PurchaseRequest fromLine(String[] f) {
+        return new PurchaseRequest(f[0], f[1], f[2], f[3], f[4]);
+    }
+}
+
+// Purchase receipt model
 class Purchase {
     private final String id;
     private final String listingId;
@@ -95,6 +126,7 @@ class Purchase {
     }
 
     public String getId() { return id; }
+    public String getListingId() { return listingId; }
     public String getTitle() { return title; }
     public double getPrice() { return price; }
     public String getSellerId() { return sellerId; }

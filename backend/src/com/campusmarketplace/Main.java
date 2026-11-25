@@ -66,15 +66,16 @@ public class Main {
         return true;
     }
 
-    // User Menu: Browse/Search, Buy Item, Sell Item, Delete Listing, My Purchases, Logout, Exit
+    // User Menu: Browse/Search, Send Purchase Request, Sell Item, View Requests & Accept, Delete Listing, My Purchases, Logout, Exit
     private boolean userMenu() throws Exception {
         System.out.printf("%n--- Menu (%s) ---%n", currentUser.getName());
         System.out.println("1. Browse / Search Listings");
-        System.out.println("2. Buy Item");
+        System.out.println("2. Send Purchase Request (Buy)");
         System.out.println("3. Sell Item");
-        System.out.println("4. Delete Listing");
-        System.out.println("5. My Purchases");
-        System.out.println("6. Logout");
+        System.out.println("4. View Incoming Requests & Accept");
+        System.out.println("5. Delete Listing");
+        System.out.println("6. My Purchases & Sales");
+        System.out.println("7. Logout");
         System.out.println("0. Exit");
 
         String ch = prompt("Choice: ");
@@ -82,11 +83,12 @@ public class Main {
 
         switch (ch) {
             case "1" -> browseListings();
-            case "2" -> buyItem();
+            case "2" -> sendPurchaseRequest();
             case "3" -> sellItem();
-            case "4" -> deleteListing();
-            case "5" -> myPurchases();
-            case "6" -> { currentUser = null; System.out.println("Logged out."); }
+            case "4" -> viewIncomingRequests();
+            case "5" -> deleteListing();
+            case "6" -> myPurchases();
+            case "7" -> { currentUser = null; System.out.println("Logged out."); }
             case "0" -> { return false; }
             default -> System.out.println("Invalid option.");
         }
@@ -122,11 +124,12 @@ public class Main {
         }
     }
 
-    private void buyItem() throws Exception {
+    private void sendPurchaseRequest() throws Exception {
         printItems(service.getListings("", "", "newest"));
         String id = prompt("\nEnter Listing ID to buy: ");
-        Purchase p = service.buyItem(id, currentUser.getId());
-        System.out.printf("Successfully bought '%s' for INR %.2f! (Order ID: %s)%n", p.getTitle(), p.getPrice(), p.getId());
+        String note = prompt("Meetup Note / Message to Seller (optional): ");
+        PurchaseRequest req = service.sendPurchaseRequest(id, currentUser.getId(), note);
+        System.out.printf("Purchase request [%s] sent to seller! The seller will review and approve.%n", req.getId());
     }
 
     private void sellItem() throws Exception {
@@ -137,6 +140,32 @@ public class Main {
 
         Listing l = service.addListing(currentUser.getId(), title, cat, price, loc);
         System.out.printf("Posted listing [%s] '%s' for INR %.2f.%n", l.getId(), l.getTitle(), l.getPrice());
+    }
+
+    private void viewIncomingRequests() throws Exception {
+        List<PurchaseRequest> incoming = service.getIncomingRequests(currentUser.getId());
+        System.out.println("\n--- Incoming Purchase Requests ---");
+        if (incoming.isEmpty()) {
+            System.out.println("No pending purchase requests for your listings.");
+            return;
+        }
+
+        System.out.printf("%-6s %-10s %-22s %-14s %-20s %-16s%n", "Req ID", "Item ID", "Item Title", "Buyer", "Note", "Date");
+        System.out.println("---------------------------------------------------------------------------------------------");
+        for (PurchaseRequest r : incoming) {
+            Listing l = service.findListing(r.getListingId());
+            System.out.printf("%-6s %-10s %-22s %-14s %-20s %-16s%n",
+                    r.getId(), r.getListingId(), l.getTitle(),
+                    service.getUserName(r.getBuyerId()),
+                    r.getNote(), r.getCreatedAt());
+        }
+
+        String reqId = prompt("\nEnter Request ID to accept (or press Enter to cancel): ");
+        if (reqId != null && !reqId.isEmpty()) {
+            Purchase p = service.acceptRequest(reqId, currentUser.getId());
+            System.out.printf("Request accepted! Item '%s' marked as SOLD to %s for INR %.2f! (Order ID: %s)%n",
+                    p.getTitle(), service.getUserName(p.getBuyerId()), p.getPrice(), p.getId());
+        }
     }
 
     private void deleteListing() throws Exception {
