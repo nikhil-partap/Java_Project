@@ -1,0 +1,718 @@
+================================================================================
+CAMPUS MARKETPLACE - ALL JAVA CONCEPTS & SYNTAX GUIDE
+Course: Programming in Java (25CSE0202)
+Format: Plain Text (Easy to read in Notepad or print)
+Purpose: Complete technical guide explaining EVERY Java concept used in the 
+         project, with exact theory, syntax, and project code examples.
+================================================================================
+
+TABLE OF TOPICS:
+1. Object-Oriented Programming (OOP)
+   1.1 Classes and Objects
+   1.2 Encapsulation (Private fields, Getters, Password Protection)
+   1.3 Constructors and the 'this' Keyword
+   1.4 Interfaces (Comparable<T>)
+2. Memory Visibility: The 'volatile' Keyword
+3. Java Collections Framework
+   3.1 List and ArrayList
+   3.2 Set and HashSet (O(1) Uniqueness)
+   3.3 Comparable vs Comparator (Sorting)
+   3.4 Collections.sort()
+4. Java File I/O (Input/Output Streams)
+   4.1 File Class (File existence and directory creation)
+   4.2 FileReader & FileWriter (Character Streams)
+   4.3 BufferedReader & BufferedWriter (Buffered I/O)
+   4.4 Try-With-Resources (Automatic Resource Management)
+   4.5 String Tokenization (Regex Escaping & Split Limits)
+5. Multithreading & Concurrency
+   5.1 ExecutorService & Thread Pool
+   5.2 Callable<V> and Future<V> (Asynchronous Results)
+   5.3 Synchronized Methods vs Synchronized Blocks (Object-Level Locks)
+   5.4 AtomicInteger (Lock-Free Thread-Safe Counters)
+   5.5 Thread Pool Lifecycle (shutdown, awaitTermination, shutdownNow)
+   5.6 Thread.sleep() (Simulating Transaction Latency)
+6. Modern Java Language Features
+   6.1 Enhanced Switch Expressions (Java 14+)
+   6.2 Lambda Expressions
+   6.3 Method References (ClassName::methodName)
+   6.4 Java Streams API (stream().map().toList())
+7. Exception Handling
+   7.1 try-catch-finally Blocks
+   7.2 Throwing Exceptions (throw new Exception)
+8. Date and Time API (java.time)
+   8.1 LocalDateTime and DateTimeFormatter
+9. Console I/O and Formatted Printing
+   9.1 Scanner Class
+   9.2 System.out.printf() and Format Specifiers
+
+================================================================================
+1. OBJECT-ORIENTED PROGRAMMING (OOP)
+================================================================================
+
+1.1 Classes and Objects
+--------------------------------------------------------------------------------
+Concept:
+A Class is a blueprint or template from which individual Objects are created.
+An Object is an instance of a class that holds state (fields) and behavior (methods).
+
+Syntax:
+   class ClassName {
+       // Fields (state)
+       // Constructor (initialization)
+       // Methods (behavior)
+   }
+   ClassName obj = new ClassName(...);
+
+In Our Project:
+In Models.java, we define 4 classes: User, Listing, PurchaseRequest, and Purchase.
+Example:
+   Listing l = new Listing("l1", "u1", "Study Table", "Furniture", 2200.0, "Hostel A", "Available");
+
+
+1.2 Encapsulation
+--------------------------------------------------------------------------------
+Concept:
+Encapsulation is the practice of wrapping data (fields) and code (methods) together 
+as a single unit and restricting direct outside access to internal fields using 
+the 'private' access modifier. Data is accessed and modified only through 
+controlled public methods (getters and business methods).
+
+Syntax:
+   public class Employee {
+       private String secret; // hidden from other classes
+       public String getSecret() { return secret; }
+   }
+
+In Our Project:
+In Models.java (User class):
+   class User {
+       private final String id;
+       private final String password; // PRIVATE!
+
+       public String getId() { return id; }
+       public boolean checkPassword(String pass) { 
+           return password.equals(pass); 
+       }
+   }
+VIVA POINT:
+We deliberately did NOT write a getPassword() method. Outside classes cannot read 
+the plain text password; they can only verify it using checkPassword(). This is a 
+classic example of data hiding and encapsulation.
+
+
+1.3 Constructors and the 'this' Keyword
+--------------------------------------------------------------------------------
+Concept:
+A constructor is a special method called automatically when an object is created 
+with 'new'. It initializes the object's fields. It has the same name as the class 
+and no return type.
+The 'this' keyword refers to the current object instance and is used to distinguish 
+instance fields from parameter variables having the same name.
+
+Syntax:
+   public ClassName(String name) {
+       this.name = name; // this.name is the field; name is the parameter
+   }
+
+In Our Project:
+In Models.java (PurchaseRequest class):
+   public PurchaseRequest(String id, String listingId, String buyerId, String note, String createdAt) {
+       this.id = id;
+       this.listingId = listingId;
+       this.buyerId = buyerId;
+       this.note = note;
+       this.createdAt = createdAt;
+   }
+
+
+1.4 Interfaces (Comparable<T>)
+--------------------------------------------------------------------------------
+Concept:
+An interface defines a contract of methods that an implementing class must fulfill.
+The 'Comparable<T>' interface (from java.lang) gives an object a natural sorting 
+order by requiring the implementation of the "compareTo(T o)" method.
+
+Syntax:
+   public interface Comparable<T> {
+       int compareTo(T o);
+   }
+
+Return Values of compareTo():
+- Negative integer: this object comes BEFORE object o.
+- Zero: this object is EQUAL to object o.
+- Positive integer: this object comes AFTER object o.
+
+In Our Project:
+In Models.java:
+   class Listing implements Comparable<Listing> {
+       private final String id;
+       ...
+       @Override
+       public int compareTo(Listing o) {
+           return o.id.compareTo(this.id); // Reverse comparison for newest ID first
+       }
+   }
+When Collections.sort(listings) is called, Java uses this compareTo() method to 
+order listings so that newer items (e.g. l10) appear before older items (e.g. l1).
+
+
+================================================================================
+2. MEMORY VISIBILITY: THE 'volatile' KEYWORD
+================================================================================
+Concept:
+In multithreaded Java applications, each CPU core has its own local memory cache. 
+When multiple threads read and write a shared variable, Thread A might modify it 
+in its local cache while Thread B continues to read a stale value from its own cache.
+
+Marking a field as 'volatile' tells the Java Virtual Machine (JVM):
+"Never cache this variable in CPU registers. Always read and write this variable 
+directly from main memory."
+
+Syntax:
+   private volatile DataType variableName;
+
+In Our Project:
+In Models.java (Listing class):
+   private volatile String status; // "Available" or "Sold"
+
+   public String getStatus() { return status; }
+   public void setStatus(String status) { this.status = status; }
+
+VIVA POINT:
+When a background worker thread executes a purchase and calls target.setStatus("Sold"), 
+the 'volatile' keyword ensures that all other reader threads immediately see 
+"Sold" in main memory, preventing stale reads.
+
+
+================================================================================
+3. JAVA COLLECTIONS FRAMEWORK
+================================================================================
+
+3.1 List and ArrayList
+--------------------------------------------------------------------------------
+Concept:
+A List is an ordered collection (sequence) that allows duplicates. 
+ArrayList is a resizable-array implementation of the List interface. Unlike static 
+arrays (int[] arr = new int[5]), an ArrayList grows dynamically as elements are added.
+
+Syntax:
+   List<Type> list = new ArrayList<>();
+   list.add(element);         // appends to the end
+   list.add(0, element);      // prepends to the beginning (index 0)
+   list.remove(indexOrObj);   // removes element
+   list.removeIf(predicate);  // removes all elements matching a condition
+   list.size();               // returns element count
+
+In Our Project:
+In MarketplaceService.java:
+   private final List<User> users = new ArrayList<>();
+   private final List<Listing> listings = new ArrayList<>();
+   private final List<PurchaseRequest> requests = new ArrayList<>();
+   private final List<Purchase> purchases = new ArrayList<>();
+
+Example of removeIf() to clean up pending requests when an item is sold:
+   requests.removeIf(r -> r.getListingId().equalsIgnoreCase(target.getId()));
+
+
+3.2 Set and HashSet (O(1) Uniqueness)
+--------------------------------------------------------------------------------
+Concept:
+A Set is a collection that CANNOT contain duplicate elements.
+HashSet implements Set using a Hash Table. It uses the hashCode() and equals() 
+methods of objects to provide constant-time O(1) performance for basic operations 
+(add, contains, remove).
+
+Syntax:
+   Set<String> set = new HashSet<>();
+   boolean wasAdded = set.add("email@domain.com"); 
+   // returns true if added, false if duplicate!
+
+In Our Project:
+In MarketplaceService.java:
+   private final Set<String> emails = new HashSet<>();
+
+   public synchronized User register(String name, String email, String pass, String dept) throws Exception {
+       String cleanEmail = FileStorage.clean(email).toLowerCase();
+       if (!emails.add(cleanEmail)) {
+           throw new Exception("Email already registered.");
+       }
+       ...
+   }
+VIVA POINT:
+Why use HashSet over ArrayList?
+In an ArrayList, checking if an email exists requires searching every element, 
+taking O(n) linear time. A HashSet checks for existing emails in O(1) constant time, 
+ensuring registration never slows down as the user base grows.
+
+
+3.3 Comparable vs Comparator (Sorting)
+--------------------------------------------------------------------------------
+Concept:
+- Comparable: Defines the NATURAL ordering of a single class. Written inside the 
+  class itself by implementing compareTo().
+- Comparator: Defines CUSTOM or ALTERNATIVE sorting orders. Defined outside the 
+  class, allowing sorting by multiple criteria (e.g. price low-to-high, price high-to-low).
+
+Syntax:
+   // Natural sorting
+   Collections.sort(list);
+
+   // Custom Comparator sorting
+   list.sort(Comparator.comparingDouble(Listing::getPrice));
+   list.sort(Comparator.comparingDouble(Listing::getPrice).reversed());
+
+In Our Project:
+In MarketplaceService.java (getListings method):
+   if ("price_asc".equalsIgnoreCase(sort)) {
+       list.sort(Comparator.comparingDouble(Listing::getPrice));
+   } else if ("price_desc".equalsIgnoreCase(sort)) {
+       list.sort(Comparator.comparingDouble(Listing::getPrice).reversed());
+   } else {
+       Collections.sort(list); // Natural order: newest first using Comparable
+   }
+
+
+================================================================================
+4. JAVA FILE I/O (INPUT/OUTPUT STREAMS)
+================================================================================
+
+4.1 File Class
+--------------------------------------------------------------------------------
+Concept:
+java.io.File is an abstract representation of file and directory pathnames. 
+It does not read or write data itself; it inspects file system properties (checks 
+existence, creates directories, deletes files).
+
+Syntax:
+   File file = new File("folder/filename.txt");
+   file.exists();   // boolean: true if file exists on disk
+   file.mkdirs();   // boolean: creates parent directories if they don't exist
+
+In Our Project:
+In FileStorage.java:
+   private final File folder = new File("data");
+   public boolean hasData() {
+       return new File(folder, "users.txt").exists();
+   }
+   public synchronized void saveAll(...) {
+       if (!folder.exists()) folder.mkdirs();
+       ...
+   }
+
+
+4.2 FileReader & FileWriter vs BufferedReader & BufferedWriter
+--------------------------------------------------------------------------------
+Concept:
+- FileReader and FileWriter are Character Streams that read/write character-by-character 
+  directly to the operating system's disk. This is slow because each character 
+  triggers a disk access request.
+- BufferedReader and BufferedWriter are Wrapper Streams that buffer characters in 
+  an internal RAM memory array. They read and write large chunks of data at once, 
+  which is dramatically faster.
+
+Syntax:
+   // Writing with buffer
+   BufferedWriter bw = new BufferedWriter(new FileWriter(file));
+   bw.write("Hello World");
+   bw.newLine(); // writes OS-independent newline
+
+   // Reading with buffer
+   BufferedReader br = new BufferedReader(new FileReader(file));
+   String line = br.readLine(); // reads full line until \n, returns null at EOF
+
+
+4.3 Try-With-Resources (Automatic Resource Management)
+--------------------------------------------------------------------------------
+Concept:
+Introduced in Java 7. It ensures that every resource declared in the 'try' 
+parentheses is automatically closed when the try block exits. The resource class 
+must implement the 'java.lang.AutoCloseable' interface.
+
+Syntax:
+   try (ResourceType resource = new ResourceType()) {
+       // use resource
+   } catch (IOException e) {
+       // handle error
+   } // resource.close() is ALWAYS called automatically here!
+
+In Our Project:
+In FileStorage.java:
+   private void writeFile(String fileName, List<String> lines) {
+       try (BufferedWriter bw = new BufferedWriter(new FileWriter(new File(folder, fileName)))) {
+           for (String line : lines) {
+               bw.write(line);
+               bw.newLine();
+           }
+       } catch (IOException e) {
+           System.out.println("File write error: " + e.getMessage());
+       }
+   }
+VIVA POINT:
+Why is this important?
+Without try-with-resources, if an IOException occurs while writing, the file handle 
+would remain open, causing a file lock or memory leak. Try-with-resources guarantees 
+closure in all cases.
+
+
+4.4 String Tokenization (Regex Escaping & Split Limits)
+--------------------------------------------------------------------------------
+Concept:
+String.split(regex, limit) splits a string into an array based on a regular expression.
+
+Syntax:
+   String[] tokens = line.split("\\|", -1);
+
+Two Critical Details:
+1. Regex Escaping ("\\|"):
+   In Regular Expressions, the single pipe "|" is the logical OR operator. 
+   Writing split("|") would split after every character. To match a literal pipe, 
+   we escape it with two backslashes: "\\|".
+2. Negative Limit (-1):
+   By default, split() discards trailing empty strings. If a buyer sends a request 
+   without a note (e.g. "r1|l1|u2||2026-11-25"), standard split() would drop the 
+   blank note. Passing "-1" forces Java to preserve all empty trailing columns.
+
+
+================================================================================
+5. MULTITHREADING & CONCURRENCY
+================================================================================
+
+5.1 ExecutorService & Thread Pool
+--------------------------------------------------------------------------------
+Concept:
+Creating a new Java Thread (new Thread()) is an expensive operating system operation. 
+If 100 users make requests, creating 100 threads would exhaust CPU and memory.
+An ExecutorService manages a pool of pre-created, reusable worker threads. 
+Tasks are queued and executed by available threads in the pool.
+
+Syntax:
+   ExecutorService pool = Executors.newFixedThreadPool(4); // 4 reusable threads
+   pool.submit(callableTask);
+   pool.shutdown();
+
+In Our Project:
+In Main.java:
+   ExecutorService orderPool = Executors.newFixedThreadPool(4);
+   MarketplaceService service = new MarketplaceService(orderPool, storage);
+
+
+5.2 Callable<V> and Future<V>
+--------------------------------------------------------------------------------
+Concept:
+- Runnable: A task that runs in the background but CANNOT return a value and 
+  CANNOT throw checked exceptions.
+- Callable<V>: A task that runs in the background, RETURNS a result of type V, 
+  and can throw checked exceptions.
+- Future<V>: Represents the pending result of an asynchronous computation. 
+  Calling "future.get(timeout, unit)" waits for the worker thread to finish and 
+  retrieves the returned object.
+
+Syntax:
+   Callable<Purchase> task = () -> completeSale(target, req);
+   Future<Purchase> future = orderPool.submit(task);
+   Purchase p = future.get(5, TimeUnit.SECONDS); // waits up to 5 seconds
+
+In Our Project:
+In MarketplaceService.java (acceptRequest method):
+   public Purchase acceptRequest(String requestId, String sellerId) throws Exception {
+       ...
+       Future<Purchase> future = orderPool.submit(() -> completeSale(target, req));
+       return future.get(5, TimeUnit.SECONDS);
+   }
+
+
+5.3 Synchronized Methods vs Synchronized Blocks (Object-Level Locking)
+--------------------------------------------------------------------------------
+Concept:
+A Race Condition happens when two threads access and modify shared data at the same 
+time, leading to corrupted state (e.g. the same item being sold to two different people).
+The 'synchronized' keyword in Java utilizes an intrinsic monitor lock to ensure 
+that only ONE thread can execute the protected code at any given time.
+
+Syntax:
+   // 1. Synchronized Method (locks on 'this' instance)
+   public synchronized void methodName() { ... }
+
+   // 2. Synchronized Block (locks on a specific target object)
+   synchronized (targetObject) {
+       // critical section
+   }
+
+In Our Project:
+In MarketplaceService.java (completeSale method):
+   private Purchase completeSale(Listing target, PurchaseRequest acceptedReq) throws Exception {
+       Purchase p;
+       synchronized (target) { // LOCKS ONLY THIS SPECIFIC LISTING!
+           if ("Sold".equalsIgnoreCase(target.getStatus())) {
+               throw new Exception("This item has already been SOLD.");
+           }
+           Thread.sleep(100); // simulate transaction processing
+           target.setStatus("Sold");
+           p = new Purchase("p" + purchaseSeq.incrementAndGet(), ...);
+           synchronized (this) {
+               requests.removeIf(r -> r.getListingId().equalsIgnoreCase(target.getId()));
+               purchases.add(0, p);
+               save();
+           }
+       }
+       return p;
+   }
+VIVA POINT:
+Why lock on (target) instead of synchronizing the whole method?
+If we synchronised the whole method, only ONE student in the entire university 
+could buy anything at a time, creating a huge bottleneck. Locking on (target) 
+allows 100 students to buy 100 different items simultaneously, while guaranteeing 
+that two students can never buy the SAME item at once.
+
+
+5.4 AtomicInteger (Lock-Free Thread-Safe Counters)
+--------------------------------------------------------------------------------
+Concept:
+The operation "counter++" is not atomic. It consists of three bytecode instructions:
+1. Read current value from memory
+2. Add 1 to value
+3. Write new value back to memory
+If two threads execute "counter++" simultaneously, they can both read 5 and write 6, 
+losing an increment and causing duplicate IDs.
+AtomicInteger (from java.util.concurrent.atomic) provides lock-free, thread-safe 
+operations using low-level CPU Compare-And-Swap (CAS) instructions.
+
+Syntax:
+   AtomicInteger seq = new AtomicInteger(0);
+   int nextId = seq.incrementAndGet(); // safely increments and returns new value
+   seq.accumulateAndGet(newNum, Math::max); // updates to the maximum value
+
+In Our Project:
+In MarketplaceService.java:
+   private final AtomicInteger userSeq = new AtomicInteger();
+   private final AtomicInteger listingSeq = new AtomicInteger();
+   private final AtomicInteger requestSeq = new AtomicInteger();
+   private final AtomicInteger purchaseSeq = new AtomicInteger();
+
+Used to generate IDs: "u" + userSeq.incrementAndGet(), "l" + listingSeq.incrementAndGet(), etc.
+
+
+5.5 Thread Pool Lifecycle Management
+--------------------------------------------------------------------------------
+Concept:
+Thread pools must be explicitly shut down when the application terminates; 
+otherwise, active worker threads will prevent the Java Virtual Machine from exiting.
+
+Syntax:
+   pool.shutdown(); // Stop accepting new tasks; finish existing tasks
+   pool.awaitTermination(timeout, unit); // Wait for tasks to finish
+   pool.shutdownNow(); // Forcefully interrupt hanging tasks
+
+In Our Project:
+In Main.java:
+   try (Scanner sc = new Scanner(System.in)) {
+       new Main(service, sc).run();
+   } finally {
+       orderPool.shutdown();
+       try {
+           if (!orderPool.awaitTermination(3, TimeUnit.SECONDS)) {
+               orderPool.shutdownNow();
+           }
+       } catch (InterruptedException e) {
+           orderPool.shutdownNow();
+       }
+       System.out.println("Goodbye!");
+   }
+
+
+================================================================================
+6. MODERN JAVA LANGUAGE FEATURES
+================================================================================
+
+6.1 Enhanced Switch Expressions (Java 14+)
+--------------------------------------------------------------------------------
+Concept:
+Traditional switch statements require verbose 'case', 'break;', and are prone to 
+fall-through bugs. Enhanced switch expressions use the arrow operator '->' to 
+execute clean, self-contained statements without needing 'break;'.
+
+Syntax:
+   switch (variable) {
+       case "1" -> doOptionOne();
+       case "2" -> doOptionTwo();
+       default -> doDefault();
+   }
+
+In Our Project:
+In Main.java:
+   switch (ch) {
+       case "1" -> browseListings();
+       case "2" -> sendPurchaseRequest();
+       case "3" -> sellItem();
+       case "4" -> viewIncomingRequests();
+       case "5" -> deleteListing();
+       case "6" -> myPurchases();
+       case "7" -> { currentUser = null; System.out.println("Logged out."); }
+       case "0" -> { return false; }
+       default -> System.out.println("Invalid option.");
+   }
+
+
+6.2 Lambda Expressions
+--------------------------------------------------------------------------------
+Concept:
+A lambda expression is an anonymous function (a function without a name) that can 
+be passed as an argument. It provides a concise way to implement Single Abstract 
+Method (SAM) interfaces (Functional Interfaces).
+
+Syntax:
+   (parameters) -> { body }
+
+In Our Project:
+1. Submitting a Callable task:
+   orderPool.submit(() -> completeSale(target, req));
+2. Filtering with Predicate:
+   requests.removeIf(r -> r.getListingId().equalsIgnoreCase(target.getId()));
+
+
+6.3 Method References (ClassName::methodName)
+--------------------------------------------------------------------------------
+Concept:
+A shorthand syntax for a lambda expression that simply calls an existing method.
+
+Syntax:
+   Class::method
+
+In Our Project:
+1. Mapping objects to text:
+   users.stream().map(User::toLine).toList(); 
+   // Equivalent to: users.stream().map(u -> u.toLine()).toList();
+2. Sorting by price:
+   Comparator.comparingDouble(Listing::getPrice);
+   // Equivalent to: Comparator.comparingDouble(l -> l.getPrice());
+
+
+6.4 Java Streams API
+--------------------------------------------------------------------------------
+Concept:
+Introduced in Java 8, Streams allow functional-style operations on sequences of 
+elements (filter, map, sort, collect).
+
+Syntax:
+   List<String> result = list.stream()
+                             .map(Object::toString)
+                             .toList();
+
+In Our Project:
+In FileStorage.java:
+   writeFile("users.txt", users.stream().map(User::toLine).toList());
+   writeFile("listings.txt", listings.stream().map(Listing::toLine).toList());
+
+
+================================================================================
+7. EXCEPTION HANDLING
+================================================================================
+
+7.1 try-catch-finally Blocks
+--------------------------------------------------------------------------------
+Concept:
+- 'try': Encloses code that might throw an error.
+- 'catch': Intercepts and handles specific exceptions without crashing the program.
+- 'finally': Code block that is GUARANTEED to execute whether an exception occurred or not.
+
+Syntax:
+   try {
+       // code that may fail
+   } catch (Exception e) {
+       // handle error
+   } finally {
+       // cleanup code (always runs)
+   }
+
+
+7.2 Throwing Exceptions
+--------------------------------------------------------------------------------
+Concept:
+The 'throw' keyword is used to explicitly throw an exception when business validation 
+fails.
+
+Syntax:
+   if (invalidCondition) {
+       throw new Exception("Custom error message");
+   }
+
+In Our Project:
+In MarketplaceService.java:
+   if (price < 0) {
+       throw new Exception("Price must be >= 0.");
+   }
+   if (target.getOwnerId().equals(buyerId)) {
+       throw new Exception("You cannot request to buy your own listing!");
+   }
+
+
+================================================================================
+8. DATE AND TIME API (java.time)
+================================================================================
+Concept:
+Modern Java 8+ Date and Time API (in java.time) replaced legacy java.util.Date and 
+SimpleDateFormat, which were mutable and notoriously thread-unsafe.
+- LocalDateTime: Represents date and time without a timezone (e.g. 2026-11-25 10:30).
+- DateTimeFormatter: Formats date-time objects into readable strings in a thread-safe manner.
+
+Syntax:
+   DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+   String nowStr = LocalDateTime.now().format(fmt);
+
+In Our Project:
+In MarketplaceService.java:
+   private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+   ...
+   LocalDateTime.now().format(TIME_FMT);
+
+
+================================================================================
+9. CONSOLE I/O AND FORMATTED PRINTING
+================================================================================
+
+9.1 Scanner Class
+--------------------------------------------------------------------------------
+Concept:
+java.util.Scanner parses primitive types and strings using regular expressions from 
+an input stream (such as System.in for keyboard input).
+
+Syntax:
+   Scanner sc = new Scanner(System.in);
+   sc.hasNextLine(); // checks if input is available
+   sc.nextLine();    // reads the entire entered line as String
+
+In Our Project:
+In Main.java:
+   private String prompt(String text) {
+       System.out.print(text);
+       return sc.hasNextLine() ? sc.nextLine().trim() : null;
+   }
+
+
+9.2 System.out.printf() and Format Specifiers
+--------------------------------------------------------------------------------
+Concept:
+printf() writes formatted strings using format specifiers, enabling clean tabular 
+console output.
+
+Format Specifiers:
+- %s    : Formats a String
+- %-24s : Left-aligns a String padded to 24 characters
+- %.2f  : Formats a floating-point number with exactly 2 decimal places
+- %-9.2f: Left-aligns a floating-point number padded to 9 characters with 2 decimals
+- %n    : Platform-independent newline (preferred over \n)
+
+In Our Project:
+In Main.java:
+   System.out.printf("%-5s %-24s %-12s %-9.2f %-10s %-14s%n",
+       l.getId(), l.getTitle(), l.getCategory(), l.getPrice(), l.getStatus(), l.getLocation());
+
+Prints clean, aligned columns:
+ID    Title                    Category     Price     Status     Location      
+-------------------------------------------------------------------------------
+l1    Study Table with Shelf   Furniture    2200.00   Available  Hostel Block A
+l2    Scientific Calculator    Electronics  800.00    Available  Library Block 
+
+================================================================================
+END OF GUIDE - KEEP THIS FILE HANDY FOR YOUR JAVA VIVA!
+================================================================================
