@@ -49,7 +49,7 @@ public class ConsoleApp {
 
     private boolean guestMenu() throws MarketplaceException {
         System.out.println("\n--- Guest Menu ---");
-        System.out.println("1. Login   2. Register   3. Browse Listings   4. Concurrency Demo   5. Live Stats   0. Exit");
+        System.out.println("1. Login   2. Register   3. Browse Listings   0. Exit");
         String ch = prompt("Choice: ");
         if (ch == null) return false;
 
@@ -57,8 +57,6 @@ public class ConsoleApp {
             case "1" -> login();
             case "2" -> register();
             case "3" -> browseListings();
-            case "4" -> concurrencyDemo();
-            case "5" -> showStats();
             case "0" -> { return false; }
             default -> System.out.println("Invalid option.");
         }
@@ -66,32 +64,25 @@ public class ConsoleApp {
     }
 
     private boolean userMenu() throws MarketplaceException {
-        boolean isAdmin = "admin".equalsIgnoreCase(currentUser.getRole());
-        System.out.printf("%n--- Menu (%s | %s mode) ---%n", currentUser.getName(), currentUser.getMode());
-        System.out.println("1. Browse/Search   2. Item Details   3. Send Request   4. Buy Item   5. My Purchases");
-        System.out.println("6. Switch Mode     7. Post Listing   8. Delete Listing 9. Race Demo  10. Live Stats");
-        if (isAdmin) System.out.println("11. Admin: Block/Unblock User");
-        System.out.println("12. Logout         0. Exit");
+        System.out.printf("%n--- Menu (%s) ---%n", currentUser.getName());
+        System.out.println("1. Browse / Search Listings");
+        System.out.println("2. Buy Item");
+        System.out.println("3. Sell Item");
+        System.out.println("4. Delete Listing");
+        System.out.println("5. My Purchases");
+        System.out.println("6. Logout");
+        System.out.println("0. Exit");
 
         String ch = prompt("Choice: ");
         if (ch == null) return false;
 
         switch (ch) {
             case "1" -> browseListings();
-            case "2" -> itemDetails();
-            case "3" -> sendRequest();
-            case "4" -> buyItem();
+            case "2" -> buyItem();
+            case "3" -> postListing();
+            case "4" -> deleteListing();
             case "5" -> myPurchases();
-            case "6" -> {
-                currentUser = service.switchMode(currentUser);
-                System.out.println("Mode switched to: " + currentUser.getMode());
-            }
-            case "7" -> postListing();
-            case "8" -> deleteListing();
-            case "9" -> concurrencyDemo();
-            case "10" -> showStats();
-            case "11" -> { if (isAdmin) adminBlockUser(); else System.out.println("Admin only."); }
-            case "12" -> { currentUser = null; System.out.println("Logged out."); }
+            case "6" -> { currentUser = null; System.out.println("Logged out."); }
             case "0" -> { return false; }
             default -> System.out.println("Invalid option.");
         }
@@ -159,10 +150,6 @@ public class ConsoleApp {
     }
 
     private void postListing() throws MarketplaceException {
-        if (!"seller".equalsIgnoreCase(currentUser.getMode())) {
-            currentUser = service.switchMode(currentUser);
-            System.out.println("Switched to seller mode.");
-        }
         String title = prompt("Title: ");
         String cat = prompt("Category: ");
         double price = Double.parseDouble(prompt("Price (INR): "));
