@@ -41,11 +41,25 @@ class MarketplaceService {
             users.add(new User("u1", "Aarav Mehta", "aarav@campus.edu", "password123", "CSE"));
             users.add(new User("u2", "Ananya Sharma", "ananya@campus.edu", "password123", "Design"));
             users.add(new User("u3", "Riya Kapoor", "riya@campus.edu", "password123", "Commerce"));
+            users.add(new User("u4", "Vansh Gupta", "vansh@campus.edu", "password123", "CSE"));
+            users.add(new User("u5", "Ishaan Verma", "ishaan@campus.edu", "password123", "Mechanical"));
+            users.add(new User("u6", "Sneha Patel", "sneha@campus.edu", "password123", "Electronics"));
 
-            listings.add(new Listing("l1", "u1", "Study Table", "Furniture", 2400.0, "Hostel A", "Available"));
-            listings.add(new Listing("l2", "u2", "HP Laptop Bag", "Accessories", 850.0, "North Gate", "Available"));
-            listings.add(new Listing("l3", "u3", "Engineering Textbooks", "Books", 1200.0, "Library Block", "Available"));
-            listings.add(new Listing("l4", "u1", "Campus Bicycle", "Cycles", 7500.0, "Sports Complex", "Available"));
+            listings.add(new Listing("l1", "u1", "Study Table with Shelf", "Furniture", 2200.0, "Hostel Block A", "Available"));
+            listings.add(new Listing("l2", "u2", "Scientific Calculator fx-991EX", "Electronics", 800.0, "Library Block", "Available"));
+            listings.add(new Listing("l3", "u3", "Engineering Mathematics Vol 1", "Books", 450.0, "Reading Hall", "Available"));
+            listings.add(new Listing("l4", "u5", "Hercules Roadeo Bicycle", "Cycles", 5200.0, "Sports Complex", "Available"));
+            listings.add(new Listing("l5", "u6", "Digital Multimeter & Breadboard", "Lab Gear", 950.0, "ECE Lab 2", "Available"));
+            listings.add(new Listing("l6", "u1", "Ergonomic Desk Chair", "Furniture", 1800.0, "Hostel Block B", "Available"));
+            listings.add(new Listing("l7", "u4", "Data Structures & Algorithms in Java", "Books", 600.0, "Turing Block", "Available"));
+            listings.add(new Listing("l8", "u2", "Wireless Mouse & Keyboard Combo", "Electronics", 1100.0, "Design Studio", "Available"));
+            listings.add(new Listing("l9", "u3", "Drawing Board & Mini Drafter", "Lab Gear", 700.0, "Mech Block", "Available"));
+            listings.add(new Listing("l10", "u5", "Gear Bicycle with Lock & Helmet", "Cycles", 6400.0, "Main Gate", "Sold"));
+
+            requests.add(new PurchaseRequest("r1", "l1", "u2", "Can I inspect the table this evening after 6pm?", "2026-11-25 10:15"));
+            requests.add(new PurchaseRequest("r2", "l3", "u4", "Need this book for mid-sem exams. Can meet at library!", "2026-11-25 10:20"));
+
+            purchases.add(new Purchase("p1", "l10", "Gear Bicycle with Lock & Helmet", 6400.0, "u5", "u1", "2026-11-24 16:30"));
             save();
         }
 
