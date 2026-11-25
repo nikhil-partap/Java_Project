@@ -1,158 +1,235 @@
-# Campus Marketplace — Java Viva Preparation Guide
+# Campus Marketplace — Complete Java Viva Preparation Guide
 
 **Course:** Programming in Java (`25CSE0202`)  
 **Project:** Campus Marketplace (Console Edition)  
-**Language & Environment:** Plain Java 21 (JDK only, no external libraries)
+**Language & Runtime:** Plain Java 21 (JDK Standard Library, No External Frameworks)  
+**Architecture:** 4 Core Source Files + File Persistence + Multithreaded Concurrency  
 
 ---
 
-## 1. Quick Project Elevator Pitch (30-second Viva Answer)
+## 1. 30-Second Elevator Pitch (Memorize This for Viva Opening)
 
-> *"Campus Marketplace is a console-based peer-to-peer buy and sell application designed for college campuses. It allows students to create accounts, browse/search items, post used goods for sale, and send purchase requests with meetup messages. Sellers review incoming purchase requests on their listings and decide which buyer to accept. Under the hood, it uses **Object-Oriented Programming**, **Collections Framework**, **File Handling with buffered streams**, and **Multithreading** with an `ExecutorService` thread pool and `synchronized` locking to ensure thread-safe sales transactions."*
+> *"Campus Marketplace is a console-based peer-to-peer marketplace designed for college campuses. It allows students to create accounts, browse and search items across categories, list their own goods for sale, and send purchase requests with meetup messages. Sellers review incoming requests on their listings and decide which buyer to accept. Under the hood, it is built with **Object-Oriented Programming (encapsulation and interfaces)**, the **Collections Framework (ArrayList, HashSet)**, **File I/O (BufferedReader/BufferedWriter with try-with-resources)**, and **Multithreading** with an `ExecutorService` thread pool and `synchronized` locking to guarantee that an item can never be double-sold."*
 
 ---
 
-## 2. Project File Structure & What Each File Does
+## 2. Project File Structure
 
-The entire application is organized cleanly into **4 core Java source files** inside `backend/src/com/campusmarketplace/`:
+The entire application consists of only **4 clean, self-contained Java source files** inside `backend/src/com/campusmarketplace/`:
 
 ```
-backend/
-├── run.bat / run.sh              One-click compilation and execution script
-├── data/                         Directory where text files are saved automatically
-│   ├── users.txt
-│   ├── listings.txt
-│   ├── requests.txt
-│   └── purchases.txt
-└── src/com/campusmarketplace/
-    ├── Models.java               Data models (User, Listing, PurchaseRequest, Purchase)
-    ├── FileStorage.java          File I/O (BufferedReader / BufferedWriter persistence)
-    ├── MarketplaceService.java   Core business logic, collections, requests & thread-safe sales
-    └── Main.java                 Program entry point, thread pool setup & console menus
+Java_Project/
+├── VIVA_PREPARATION_GUIDE.md         This complete preparation guide
+└── backend/
+    ├── run.bat / run.sh              One-click compile and execution script
+    ├── data/                         Auto-generated text database files
+    │   ├── users.txt                 Registered user accounts
+    │   ├── listings.txt              Active and sold items
+    │   ├── requests.txt              Pending buyer purchase requests
+    │   └── purchases.txt             Completed sale receipts
+    └── src/com/campusmarketplace/
+        ├── Models.java               Data entities (User, Listing, PurchaseRequest, Purchase)
+        ├── FileStorage.java          File I/O persistence engine
+        ├── MarketplaceService.java   Business rules, collections & thread-safe transactions
+        └── Main.java                 Console UI, menus & thread pool lifecycle
 ```
 
 ---
 
-### Detailed Breakdown of Each File
-
-### 1. `Models.java`
-* **What it does:** Defines the entity classes used across the system:
-  1. `User`: Holds student credentials (`id`, `name`, `email`, `password`, `department`). Uses encapsulation so passwords can only be verified via `checkPassword()`.
-  2. `Listing`: Represents an item for sale (`id`, `ownerId`, `title`, `category`, `price`, `location`, `status`). Implements `Comparable<Listing>` to sort listings by newest first. Uses a `volatile String status` to ensure visibility across multiple threads.
-  3. `PurchaseRequest`: Represents a buyer's request to purchase an item (`id`, `listingId`, `buyerId`, `note`, `createdAt`).
-  4. `Purchase`: An immutable receipt created once a seller accepts a request (`id`, `listingId`, `title`, `price`, `sellerId`, `buyerId`, `purchasedAt`).
-* **Key Java features:** Encapsulation (private fields + getters), `Comparable<T>` interface implementation, serialization helpers (`toLine()` and `fromLine()`).
+## 3. Deep Dive: What Each File Does & Key Java Concepts
 
 ---
 
-### 2. `FileStorage.java`
-* **What it does:** Provides persistent file storage so data survives application restarts.
-* **How it works:**
-  - Reads and writes text files inside the `backend/data/` folder: `users.txt`, `listings.txt`, `requests.txt`, and `purchases.txt`.
-  - Serializes fields using a pipe separator (`|`).
-  - Includes a `clean()` method to sanitize user input so commas and pipes don't corrupt the file format.
-* **Key Java features:** 
-  - `BufferedReader` and `BufferedWriter` for efficient I/O.
-  - `FileReader` and `FileWriter`.
-  - **Try-with-resources** to guarantee file streams are automatically closed without resource leaks.
+### File 1: `Models.java`
+**Role:** Defines the data structure of the application.
+
+It contains 4 classes:
+1. **`User`**:
+   - Fields: `id`, `name`, `email`, `password`, `department`.
+   - **Encapsulation:** Password is stored as `private`. There is no getter for password (`getPassword()` does not exist). Instead, verification is done through `checkPassword(pass)` to protect credentials.
+2. **`Listing`**:
+   - Fields: `id`, `ownerId`, `title`, `category`, `price`, `location`, `volatile String status`.
+   - **`Comparable<Listing>` Interface:** Implements `compareTo(Listing o)` to sort listings naturally by ID (newest first).
+   - **`volatile` Keyword:** `status` is marked `volatile` so that when a worker thread marks an item as `"Sold"`, all other threads immediately read the updated value from main memory.
+3. **`PurchaseRequest`**:
+   - Fields: `id`, `listingId`, `buyerId`, `note`, `createdAt`.
+   - Represents an inquiry from a buyer to a seller with meetup notes.
+4. **`Purchase`**:
+   - Fields: `id`, `listingId`, `title`, `price`, `sellerId`, `buyerId`, `purchasedAt`.
+   - An immutable transaction record generated after a seller accepts a request.
+
+> **Serialization Format:** Each model class has `toLine()` (converts the object into a pipe-delimited string `field1|field2|...`) and a static `fromLine(String[] f)` (reconstructs the object from split text).
 
 ---
 
-### 3. `MarketplaceService.java`
-* **What it does:** The engine of the project containing all business rules, in-memory collections, and thread concurrency.
-* **Responsibilities:**
-  - **Account Operations:** `login()` with case-insensitive email check and `register()` with duplicate email prevention.
-  - **Listing Operations:** `addListing()`, `deleteListing()` (ensuring a student can only delete their own listing and cannot delete sold items), and `getListings()` with category/keyword filters and sorting.
-  - **Purchase Request Workflow:**
-    - `sendPurchaseRequest()`: Validates that a buyer cannot request their own item, prevents duplicate requests on the same item, and stores the buyer's meetup note.
-    - `getIncomingRequests()`: Filters and displays pending purchase requests for items owned by the logged-in seller.
-    - `acceptRequest()`: Allows the seller to pick which buyer to sell to. It executes `completeSale()` on the background `orderPool` thread pool with a `synchronized (target)` lock on the item, sets status to `Sold`, records the `Purchase` receipt, and automatically purges pending requests for that item.
-  - **Auto-save:** Automatically triggers `FileStorage.saveAll()` whenever an item is added, requested, accepted, or deleted.
-* **Key Java features:**
-  - `ArrayList` and `HashSet` (`O(1)` email uniqueness check).
-  - `AtomicInteger` (`userSeq`, `listingSeq`, `requestSeq`, `purchaseSeq`) for thread-safe sequential ID generation without locking.
-  - `ExecutorService` and `Future<Purchase>` for multithreaded order execution.
-  - `synchronized` methods and object-level synchronized blocks.
+### File 2: `FileStorage.java`
+**Role:** Handles data persistence so student data is never lost when the program closes.
+
+* **Key Methods:**
+  - `saveAll(users, listings, requests, purchases)`: Writes four separate text files inside `backend/data/` (`users.txt`, `listings.txt`, `requests.txt`, `purchases.txt`).
+  - `loadUsers()`, `loadListings()`, `loadRequests()`, `loadPurchases()`: Reads line-by-line and parses them back into Java collections.
+  - `clean(String s)`: Sanitizes user input by replacing any `|` with `/` to prevent file formatting corruption.
+* **Java Concepts Used:**
+  - **`BufferedReader` and `BufferedWriter`:** Buffered streams wrap lower-level `FileReader` and `FileWriter` to minimize disk read/write system calls and improve performance.
+  - **Try-with-resources:** Uses `try (BufferedReader br = new BufferedReader(...))` so the streams automatically close, preventing file leaks.
 
 ---
 
-### 4. `Main.java`
-* **What it does:** The main entry point and user interface.
-* **Responsibilities:**
-  - `main()` creates an `ExecutorService` thread pool (4 worker threads), initializes `FileStorage` and `MarketplaceService`, and sets up clean console menus via `Scanner`.
+### File 3: `MarketplaceService.java`
+**Role:** The "Brain" / Controller containing all business rules, in-memory collections, and thread concurrency.
+
+* **Collections Used:**
+  - `List<User>`, `List<Listing>`, `List<PurchaseRequest>`, `List<Purchase>`: Dynamic lists holding active marketplace data.
+  - `Set<String> emails`: A `HashSet` providing $O(1)$ constant-time lookup to prevent duplicate email registrations.
+* **Thread-Safe ID Generation (`AtomicInteger`):**
+  - `userSeq`, `listingSeq`, `requestSeq`, `purchaseSeq`.
+  - Regular integers (`count++`) are **not thread-safe** (they involve read, increment, write). `AtomicInteger.incrementAndGet()` guarantees unique IDs across parallel threads without needing heavy locks.
+* **Purchase Request & Seller Approval Logic:**
+  - `sendPurchaseRequest()`: Validates that users cannot buy their own items, prevents duplicate requests for the same item from the same user, and records the request.
+  - `getIncomingRequests()`: Filters requests so a seller only sees requests for items *they* listed.
+  - `acceptRequest()`: Allows the seller to accept a buyer's request.
+* **Thread Concurrency & Race-Condition Protection:**
+  - Submits the purchase to the `orderPool` thread pool using `Future<Purchase> future = orderPool.submit(() -> completeSale(target, req));`.
+  - Inside `completeSale()`:
+    ```java
+    synchronized (target) {
+        if ("Sold".equalsIgnoreCase(target.getStatus())) {
+            throw new Exception("This item has already been SOLD.");
+        }
+        target.setStatus("Sold");
+        // Create purchase receipt & remove other pending requests for this listing
+    }
+    ```
+  - **Why synchronize on `target`?** If we synchronized the whole method, only one user could buy anything in the entire marketplace at once. By locking only the specific `Listing` object, multiple students can trade different items concurrently without blocking each other, but two threads can never sell the same item twice.
+
+---
+
+### File 4: `Main.java`
+**Role:** Program entry point and User Interface (Console CLI).
+
+* **Lifecycle:**
+  - `main()` starts an `ExecutorService` thread pool with 4 worker threads (`Executors.newFixedThreadPool(4)`).
+  - Initializes `FileStorage` and `MarketplaceService`.
+  - Runs the interactive CLI loop with `Scanner`.
+  - Uses a `finally` block to guarantee graceful shutdown:
+    ```java
+    finally {
+        orderPool.shutdown();
+        if (!orderPool.awaitTermination(3, TimeUnit.SECONDS)) orderPool.shutdownNow();
+    }
+    ```
+* **Menus:**
   - **Guest Menu:** Login, Register, Browse Listings, Exit.
-  - **User Menu:**
-    1. Browse / Search Listings
-    2. Send Purchase Request (Buy)
-    3. Sell Item
-    4. View Incoming Requests & Accept
-    5. Delete Listing
-    6. My Purchases & Sales
-    7. Logout
-    0. Exit
-  - Implements a `finally` block that shuts down the thread pool gracefully (`orderPool.shutdown()` and `awaitTermination()`).
-* **Key Java features:** CLI menu loops, `Scanner` input parsing, exception handling (`try-catch`), formatted printing (`System.out.printf`).
+  - **User Menu:** Browse/Search Listings, Send Purchase Request (Buy), Sell Item, View Incoming Requests & Accept, Delete Listing, My Purchases & Sales, Logout, Exit.
 
 ---
 
-## 3. How the Code Works (Execution Lifecycle)
+## 4. How the Code Works Step-by-Step (Execution Flow)
 
-1. **Startup**: When you run `run.bat` or `java com.campusmarketplace.Main`:
-   - `Main.main()` creates an `orderPool` thread pool.
-   - `MarketplaceService` initializes. It checks if `backend/data/users.txt` exists:
-     - If yes, it loads saved data from disk (`users.txt`, `listings.txt`, `requests.txt`, `purchases.txt`).
-     - If no, it seeds initial demo data (`Aarav`, `Ananya`, `Riya`, and sample items) and saves them to `data/`.
-2. **Guest Flow**:
-   - The user sees the guest menu and can browse items without an account or choose to log in / register.
-3. **Login / User Flow**:
-   - Once logged in, the user menu opens. Any user can both send buy requests and list items for sale.
-4. **Buyer Request & Seller Approval (Multithreaded Protection)**:
-   - When a buyer wants an item, they select Option 2, enter the Listing ID, and include an optional message (e.g. meetup place/time).
-   - This records a `PurchaseRequest` in `requests.txt`.
-   - The seller logs in, goes to Option 4 ("View Incoming Requests & Accept"), and reviews all incoming requests for their items.
-   - When the seller accepts a request ID, `acceptRequest()` submits a task to `orderPool`:
-     ```java
-     synchronized (target) {
-         if ("Sold".equalsIgnoreCase(target.getStatus())) {
-             throw new Exception("This item has already been SOLD.");
-         }
-         target.setStatus("Sold");
-         // Record purchase and remove other pending requests for this item
-     }
-     ```
-   - If multiple actions or threads interact at the same moment, `synchronized (target)` guarantees only one sale can execute on the listing, preventing race conditions or double-selling.
-5. **Persistence**:
-   - Any state mutation automatically writes back to `backend/data/*.txt`.
-6. **Graceful Exit**:
-   - Exiting shuts down the thread pool cleanly with a timeout, closing open resources.
+```
+[Main.main()]
+   │
+   ├── 1. Creates ExecutorService (4 Threads)
+   ├── 2. Initializes FileStorage("data")
+   ├── 3. Initializes MarketplaceService
+   │         │
+   │         ├── Checks if data/users.txt exists
+   │         ├── YES: Loads users, listings, requests, purchases from disk
+   │         └── NO:  Auto-seeds default demo data and saves to disk
+   │
+   └── 4. Starts Console Loop
+             │
+             ├── Guest Menu ──> (Login / Register / Browse)
+             │
+             └── User Menu (Once Logged In)
+                   ├── 1. Browse / Search Listings
+                   ├── 2. Send Purchase Request ──> Buyer sends request + note
+                   ├── 3. Sell Item ─────────────> Adds new item to listings
+                   ├── 4. Incoming Requests ─────> Seller reviews & accepts
+                   │                                     │
+                   │                                     └──> Runs thread-safe sale via orderPool
+                   │                                          with synchronized(target) lock
+                   ├── 5. Delete Listing ────────> Owner deletes item (if not Sold)
+                   ├── 6. Purchases & Sales ─────> View transaction receipts
+                   └── 7. Logout / Exit
+```
 
 ---
 
-## 4. Top Viva Questions & Answers
+## 5. Top 10 Viva Questions & Exact Answers
 
-### Q1: What Java concepts did you implement in this project?
+### Q1: What Java topics/features are implemented in this project?
 **Answer:**
-- **OOP:** Encapsulation with private fields in `User`/`Listing`/`PurchaseRequest`, interface implementation with `Comparable`.
-- **Collections:** `ArrayList` for dynamic lists, `HashSet` for unique email lookups, `Comparator` for custom price sorting.
-- **File I/O:** `BufferedReader`/`BufferedWriter` with try-with-resources to save/load persistent text records.
-- **Multithreading:** `ExecutorService` thread pool, `Future`, `AtomicInteger`, and `synchronized` blocks.
+1. **Object-Oriented Programming (OOP):** Encapsulation with private fields and controlled getters; abstraction of business rules; polymorphism via `Comparable<Listing>`.
+2. **Collections Framework:** `ArrayList` for dynamic lists, `HashSet` for unique email lookups, and `Comparator` for sorting by price.
+3. **File I/O:** `BufferedReader`, `BufferedWriter`, `FileReader`, `FileWriter`, and `try-with-resources`.
+4. **Multithreading & Concurrency:** `ExecutorService`, `ThreadPool`, `Future`, `AtomicInteger`, `volatile`, and `synchronized` blocks.
+5. **Exception Handling:** Custom validation throwing and catching `Exception`.
+6. **Date & Time API:** `LocalDateTime` and `DateTimeFormatter`.
 
-### Q2: Why does the seller have to approve requests instead of instant purchase?
-**Answer:**
-> *"In a campus peer-to-peer setting, physical handover and meeting locations need mutual consent. Rather than auto-marking items as sold immediately, buyers send purchase requests with meetup notes. The seller can review multiple interested buyers and pick whom to accept, matching realistic marketplace dynamics."*
+---
 
-### Q3: Why did you use `synchronized` on the listing object instead of synchronizing the whole method?
+### Q2: Why did you use `synchronized (target)` instead of `synchronized` on the whole method?
 **Answer:**
-> *"If we synchronized the entire method, only one user could perform an action in the whole marketplace at a time, creating a system bottleneck. By synchronizing only on the specific `Listing` object (`synchronized (target)`), multiple sellers and buyers can complete transactions on different items simultaneously without blocking each other."*
+> *"If we declare `public synchronized void completeSale(...)`, the entire method is locked on `this` (the service). That means only one purchase in the entire marketplace could happen at a time. By synchronizing only on the specific `Listing` object (`synchronized (target)`), multiple buyers can purchase different items at the same time, but if two threads try to buy the exact same item, one must wait and the second will see the item is already sold."*
 
-### Q4: What is the purpose of `AtomicInteger` in your service?
-**Answer:**
-> *"We use `AtomicInteger` for `userSeq`, `listingSeq`, `requestSeq`, and `purchaseSeq`. Unlike regular integers (`counter++` is not atomic and can suffer race conditions), `AtomicInteger.incrementAndGet()` guarantees thread-safe, lock-free ID generation."*
+---
 
-### Q5: Why use Try-with-Resources in FileStorage?
+### Q3: What is the purpose of `volatile` on the listing's `status`?
 **Answer:**
-> *"Try-with-resources automatically closes readers and writers (`AutoCloseable`) when the block exits, even if an IOException or runtime error occurs, preventing file descriptor and memory leaks."*
+> *"In Java, each thread can cache variable values in its CPU cache. Marking `status` as `volatile` guarantees memory visibility: any write to `status` by a background worker thread is immediately flushed to main memory so other threads always read the freshest value."*
 
-### Q6: How is data saved, and how do you reset to demo data?
+---
+
+### Q4: Why use `AtomicInteger` instead of a simple `int` counter?
 **Answer:**
-> *"Data is saved in `backend/data/` as pipe-delimited text (`users.txt`, `listings.txt`, `requests.txt`, `purchases.txt`). To reset back to original demo data, you simply delete the `backend/data` folder and restart the program."*
+> *"The operation `count++` looks like one step, but in bytecode it consists of three steps: read, update, and write back. If two threads increment a regular integer at the same time, they can read the same value and produce duplicate IDs (a race condition). `AtomicInteger.incrementAndGet()` uses low-level hardware-level Compare-And-Swap (CAS) instructions to guarantee thread-safe increment without locking."*
+
+---
+
+### Q5: Why is `HashSet` used for emails?
+**Answer:**
+> *"An `ArrayList` requires $O(n)$ linear time to check if an email already exists because it has to inspect every element. A `HashSet` uses hashing and provides $O(1)$ constant time lookup, making duplicate email checks instantaneous even as the user base grows."*
+
+---
+
+### Q6: How does Try-with-Resources work in your file storage?
+**Answer:**
+> *"Any class implementing `AutoCloseable` (like `BufferedReader` or `BufferedWriter`) inside `try ( ... )` is guaranteed to be closed when exiting the block, even if an IOException or runtime error occurs. This completely prevents file leaks and dangling handles."*
+
+---
+
+### Q7: Why use `Comparable<Listing>` and `Comparator`?
+**Answer:**
+> *"`Comparable` defines the natural ordering of a class through `compareTo()`. We use it in `Listing` to sort items newest first by default. `Comparator` is used when we want alternative sorting options, such as sorting listings by Price Ascending or Price Descending."*
+
+---
+
+### Q8: How does the Purchase Request flow work compared to an instant buy?
+**Answer:**
+> *"In a campus marketplace, physical handovers require mutual agreement on location and time. Instead of instantly marking an item sold, a buyer sends a `PurchaseRequest` with an optional meetup note. The seller goes to 'View Incoming Requests', reviews the requests, and accepts one. Accepting the request triggers the thread-safe sale transaction, marks the item as 'Sold', and cleans up other pending requests for that item."*
+
+---
+
+### Q9: What happens if two threads try to buy the same item simultaneously?
+**Answer:**
+> *"Both calls submit a task to the `orderPool`. Both threads attempt to enter `synchronized (target)`. Java grants the lock to the first thread, which checks `status == Available`, changes it to `Sold`, records the purchase, and releases the lock. When the second thread enters the synchronized block, it checks `status` and sees it is already `Sold`, immediately throwing an exception: 'This item has already been SOLD'."*
+
+---
+
+### Q10: How do you reset the project to default data if files get messed up?
+**Answer:**
+> *"You simply delete the `backend/data/` folder. When `MarketplaceService` starts, `storage.hasData()` returns false, triggering `initData()` which auto-seeds 6 demo users, 10 items, 2 sample requests, and saves them to fresh disk files."*
+
+---
+
+## 6. Live Viva Demo Cheat-Sheet
+
+| Action | Input to Type | What Evaluator Sees |
+| :--- | :--- | :--- |
+| **1. Browse as Guest** | `3` | Displays all 10 active items with price and location. |
+| **2. Login as Aarav** | `1` $\to$ `aarav@campus.edu` $\to$ `password123` | Welcomes Aarav Mehta. |
+| **3. View Incoming Request** | `4` | Shows incoming request `r1` from **Ananya Sharma** for *Study Table* with note: *"Can I inspect the table this evening after 6pm?"*. |
+| **4. Accept Request** | `r1` | Item is marked **Sold**, order receipt `p...` is created. |
+| **5. Post a New Item** | `3` $\to$ Title, Category, Price, Location | Automatically generates new ID `l11` and saves to disk. |
+| **6. Check Purchases/Sales** | `6` | Displays completed order receipts with buyer, seller, and timestamp. |
