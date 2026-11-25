@@ -46,10 +46,25 @@ class MarketplaceService {
             save();
         }
 
-        for (User u : users) emails.add(u.getEmail().toLowerCase());
-        userSeq.set(users.size());
-        listingSeq.set(listings.size());
-        purchaseSeq.set(purchases.size());
+        for (User u : users) {
+            emails.add(u.getEmail().toLowerCase());
+            userSeq.accumulateAndGet(parseNum(u.getId(), "u"), Math::max);
+        }
+        for (Listing l : listings) {
+            listingSeq.accumulateAndGet(parseNum(l.getId(), "l"), Math::max);
+        }
+        for (Purchase p : purchases) {
+            purchaseSeq.accumulateAndGet(parseNum(p.getId(), "p"), Math::max);
+        }
+    }
+
+    private static int parseNum(String id, String prefix) {
+        try {
+            if (id != null && id.startsWith(prefix)) {
+                return Integer.parseInt(id.substring(prefix.length()));
+            }
+        } catch (Exception ignored) { }
+        return 0;
     }
 
     private synchronized void save() {
@@ -118,6 +133,9 @@ class MarketplaceService {
         }
         if (target == null) throw new Exception("Listing not found.");
         if (!target.getOwnerId().equals(userId)) throw new Exception("You can only delete your own listings.");
+        if ("Sold".equalsIgnoreCase(target.getStatus())) {
+            throw new Exception("Cannot delete an item that has already been SOLD.");
+        }
 
         listings.remove(target);
         save();
@@ -126,6 +144,9 @@ class MarketplaceService {
     // Purchases with Thread Concurrency & Synchronization
     public Purchase buyItem(String listingId, String buyerId) throws Exception {
         Listing target = findListing(listingId);
+        if (target.getOwnerId().equals(buyerId)) {
+            throw new Exception("You cannot buy your own listing!");
+        }
         // Execute buy task in thread pool
         Future<Purchase> future = orderPool.submit(() -> completePurchase(target, buyerId));
         return future.get(5, TimeUnit.SECONDS);
