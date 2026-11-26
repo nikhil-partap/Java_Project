@@ -116,11 +116,23 @@ public class Main {
     }
 
     private void printItems(List<Listing> list) {
-        System.out.printf("%n%-5s %-24s %-12s %-9s %-10s %-14s%n", "ID", "Title", "Category", "Price", "Status", "Location");
-        System.out.println("-------------------------------------------------------------------------------");
+        System.out.printf("%n%-5s %-30s %-13s %-11s %-11s %-16s %-16s %-22s%n",
+                "ID", "Title", "Category", "Price(INR)", "Status", "Location", "Seller", "Email");
+        System.out.println("---------------------------------------------------------------------------------------------------------------------------------");
         for (Listing l : list) {
-            System.out.printf("%-5s %-24s %-12s %-9.2f %-10s %-14s%n",
-                    l.getId(), l.getTitle(), l.getCategory(), l.getPrice(), l.getStatus(), l.getLocation());
+            User seller = service.findUser(l.getOwnerId());
+            String sellerName = (seller != null) ? seller.getName() : l.getOwnerId();
+            String sellerEmail = (seller != null) ? seller.getEmail() : "N/A";
+
+            System.out.printf("%-5s %-30s %-13s %-11.2f %-11s %-16s %-16s %-22s%n",
+                    l.getId(),
+                    truncate(l.getTitle(), 30),
+                    truncate(l.getCategory(), 13),
+                    l.getPrice(),
+                    l.getStatus(),
+                    truncate(l.getLocation(), 16),
+                    truncate(sellerName, 16),
+                    truncate(sellerEmail, 22));
         }
     }
 
@@ -150,14 +162,17 @@ public class Main {
             return;
         }
 
-        System.out.printf("%-6s %-10s %-22s %-14s %-20s %-16s%n", "Req ID", "Item ID", "Item Title", "Buyer", "Note", "Date");
-        System.out.println("---------------------------------------------------------------------------------------------");
+        System.out.printf("%-6s %-10s %-26s %-16s %-24s %-16s%n", "Req ID", "Item ID", "Item Title", "Buyer", "Note", "Date");
+        System.out.println("---------------------------------------------------------------------------------------------------------");
         for (PurchaseRequest r : incoming) {
             Listing l = service.findListing(r.getListingId());
-            System.out.printf("%-6s %-10s %-22s %-14s %-20s %-16s%n",
-                    r.getId(), r.getListingId(), l.getTitle(),
-                    service.getUserName(r.getBuyerId()),
-                    r.getNote(), r.getCreatedAt());
+            System.out.printf("%-6s %-10s %-26s %-16s %-24s %-16s%n",
+                    r.getId(),
+                    r.getListingId(),
+                    truncate(l.getTitle(), 26),
+                    truncate(service.getUserName(r.getBuyerId()), 16),
+                    truncate(r.getNote(), 24),
+                    r.getCreatedAt());
         }
 
         String reqId = prompt("\nEnter Request ID to accept (or press Enter to cancel): ");
@@ -182,15 +197,22 @@ public class Main {
             System.out.println("No purchases or sales found.");
             return;
         }
-        System.out.printf("%-5s %-22s %-9s %-14s %-14s %-18s%n", "ID", "Title", "Price", "Buyer", "Seller", "Date");
-        System.out.println("-----------------------------------------------------------------------------------");
+        System.out.printf("%-5s %-26s %-11s %-16s %-16s %-16s%n", "ID", "Title", "Price(INR)", "Buyer", "Seller", "Date");
+        System.out.println("---------------------------------------------------------------------------------------------------");
         for (Purchase p : list) {
-            System.out.printf("%-5s %-22s %-9.2f %-14s %-14s %-18s%n",
-                    p.getId(), p.getTitle(), p.getPrice(),
-                    service.getUserName(p.getBuyerId()),
-                    service.getUserName(p.getSellerId()),
+            System.out.printf("%-5s %-26s %-11.2f %-16s %-16s %-16s%n",
+                    p.getId(),
+                    truncate(p.getTitle(), 26),
+                    p.getPrice(),
+                    truncate(service.getUserName(p.getBuyerId()), 16),
+                    truncate(service.getUserName(p.getSellerId()), 16),
                     p.getPurchasedAt());
         }
+    }
+
+    private static String truncate(String s, int max) {
+        if (s == null) return "";
+        return (s.length() > max) ? s.substring(0, max - 2) + ".." : s;
     }
 
     private String prompt(String text) {

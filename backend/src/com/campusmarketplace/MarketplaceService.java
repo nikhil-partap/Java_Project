@@ -256,6 +256,13 @@ class MarketplaceService {
         throw new Exception("Purchase request not found with ID: " + id);
     }
 
+    public synchronized User findUser(String userId) {
+        for (User u : users) {
+            if (u.getId().equals(userId)) return u;
+        }
+        return null;
+    }
+
     public synchronized String getUserName(String userId) {
         for (User u : users) {
             if (u.getId().equals(userId)) return u.getName();
